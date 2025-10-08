@@ -4,25 +4,25 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Quanlicuahang.Models
 {
     [Table("OrderItem")]
-    public class OrderItem
+    public class OrderItem : BasePrimary
     {
-        [Key]
-        public int OrderItemId { get; set; }
+        [Required]
+        public string OrderId { get; set; } = string.Empty;
+        [ForeignKey("OrderId")]
+        public virtual Order Order { get; set; } = null!;
 
-        public int OrderId { get; set; }
-        public int ProductId { get; set; }
+        [Required]
+        public string ProductId { get; set; } = string.Empty;
+        [ForeignKey("ProductId")]
+        public virtual Product Product { get; set; } = null!;
 
         [Required]
         public int Quantity { get; set; }
 
-        [Required]
+        [Required, Column(TypeName = "decimal(10,2)")]
         public decimal Price { get; set; }
 
-        [Required]
+        [Required, Column(TypeName = "decimal(10,2)")]
         public decimal Subtotal { get; set; }
-
-        // Quan hệ
-        public Order Order { get; set; }
-        public Product Product { get; set; }
     }
 }

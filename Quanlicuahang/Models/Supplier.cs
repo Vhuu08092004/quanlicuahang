@@ -4,22 +4,23 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Quanlicuahang.Models
 {
     [Table("Supplier")]
-    public class Supplier
+    public class Supplier : BasePrimary
     {
-        [Key]
-        public int SupplierId { get; set; }
+        [Required]
+        [MaxLength(255)]
+        public string Code { get; set; } = string.Empty;
 
         [Required, MaxLength(100)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [MaxLength(20)]
-        public string Phone { get; set; }
+        public string Phone { get; set; } = string.Empty;
 
         [MaxLength(100)]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
-        public string Address { get; set; }
+        public string Address { get; set; } = string.Empty;
 
-        public ICollection<Product> Products { get; set; }
+        public virtual ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }

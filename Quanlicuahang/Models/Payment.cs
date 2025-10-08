@@ -1,24 +1,23 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Mysqlx.Crud;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
     [Table("Payment")]
-    public class Payment
+    public class Payment : BasePrimary
     {
-        [Key]
-        public int PaymentId { get; set; }
-
-        public int OrderId { get; set; }
-
         [Required]
+        public string OrderId { get; set; } = string.Empty;
+        [ForeignKey("OrderId")]
+        public virtual Order Order { get; set; } = null!;
+
+        [Required, Column(TypeName = "decimal(10,2)")]
         public decimal Amount { get; set; }
 
-        public string PaymentMethod { get; set; } = "cash";
+        [Required, MaxLength(50)]
+        public string PaymentMethod { get; set; } = "cash"; 
 
-        public DateTime PaymentDate { get; set; } = DateTime.Now;
-
-        // Quan hệ
-        public Order Order { get; set; }
+        public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
     }
 }
