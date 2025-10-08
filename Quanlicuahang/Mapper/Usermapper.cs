@@ -1,7 +1,6 @@
-﻿using Quanlicuahang.DTOs.Response;
-using Quanlicuahang.Models;
-using Quanlicuahang.DTOs.Request;
+﻿using Quanlicuahang.Models;
 using AutoMapper;
+using Quanlicuahang.DTOs;
 
 namespace Quanlicuahang.Mapper
 {
@@ -9,8 +8,9 @@ namespace Quanlicuahang.Mapper
     {
         public UserMapper()
         {
-            CreateMap<User, UserResponse>();
+            CreateMap<User, UserResponse>().ReverseMap();
             CreateMap<UserRequest, User>();
+            CreateMap<UserUpdateRequest, User>();
         }
     }
 }

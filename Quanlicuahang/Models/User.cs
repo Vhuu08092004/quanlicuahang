@@ -9,7 +9,6 @@ namespace Quanlicuahang.Models
     public class User : BasePrimary
     {
         
-
         [Required]
         [MaxLength(50)]
         public string Username { get; set; } = string.Empty;
