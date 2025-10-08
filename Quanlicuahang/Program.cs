@@ -1,39 +1,82 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Quanlicuahang.Data;
+using Quanlicuahang.Exception;
 using Quanlicuahang.Repositories;
 using Quanlicuahang.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// ---------------------- CORS CONFIG ----------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:3000") // React app
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 
-// Lấy connection string từ appsettings.json
+// ---------------------- JWT CONFIG ----------------------
+var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ---------------------- DATABASE CONFIG ----------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-// đăng kí mapper
-builder.Services.AddAutoMapper(typeof(Program));
-
-// Đăng ký DbContext với MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-// Đăng ký Repositorys
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<UserService>();
+
+// ---------------------- APP SERVICES ----------------------
+builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddApplicationServices();
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
 
+// ---------------------- SWAGGER ----------------------
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// ---------------------- BUILD APP ----------------------
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ---------------------- MIDDLEWARE PIPELINE ----------------------
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
+// ✅ Enable CORS before authentication & authorization
+app.UseCors("AllowReactApp");
+
+// ✅ Enable Authentication middleware
+app.UseAuthentication();
+
+// ✅ Enable Authorization middleware
 app.UseAuthorization();
 
 app.MapControllers();
