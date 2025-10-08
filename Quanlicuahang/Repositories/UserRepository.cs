@@ -36,7 +36,7 @@ namespace Quanlicuahang.Repositories
 
         public async Task<User?> getByIdAsync(int id)
         {
-            return await _context.Users.FirstAsync(u => u.Id == id);
+            return await _context.Users.FirstAsync(u => u.Id == id.ToString());
         }
 
         public async Task<User?> Update(User user)

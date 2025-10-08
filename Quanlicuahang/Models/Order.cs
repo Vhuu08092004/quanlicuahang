@@ -4,27 +4,38 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Quanlicuahang.Models
 {
     [Table("Order")]
-    public class Order
+    public class Order : BasePrimary
     {
-        [Key]
-        public int OrderId { get; set; }
 
-        public int? CustomerId { get; set; }
-        public int? UserId { get; set; }
-        public int? PromoId { get; set; }
+        [Required]
+        [MaxLength(50)]
+        public string Code { get; set; } = string.Empty;
 
-        public DateTime OrderDate { get; set; } = DateTime.Now;
+        public string? CustomerId { get; set; }
+        [ForeignKey("CustomerId")]
+        public virtual Customer? Customer { get; set; }
 
+        public string? UserId { get; set; }
+        [ForeignKey("UserId")]
+        public virtual User? User { get; set; }
+
+        public string? PromoId { get; set; }
+        [ForeignKey("PromoId")]
+        public virtual Promotion? Promotion { get; set; }
+
+        [Required]
+        public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+
+        [Required, MaxLength(20)]
         public string Status { get; set; } = "pending";
 
+        [Column(TypeName = "decimal(10,2)")]
         public decimal TotalAmount { get; set; }
+
+        [Column(TypeName = "decimal(10,2)")]
         public decimal DiscountAmount { get; set; } = 0;
 
-        // Quan hệ
-        public Customer Customer { get; set; }
-        public User User { get; set; }
-        public Promotion Promotion { get; set; }
-        public ICollection<OrderItem> OrderItems { get; set; }
-        public ICollection<Payment> Payments { get; set; }
+        public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+        public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
 }

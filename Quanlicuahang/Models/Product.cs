@@ -4,32 +4,33 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Quanlicuahang.Models
 {
     [Table("Product")]
-    public class Product
+    public class Product : BasePrimary
     {
-        [Key]
-        public int ProductId { get; set; }
-
-        public int? CategoryId { get; set; }
-        public int? SupplierId { get; set; }
+        [Required]
+        [MaxLength(255)]
+        public string Code { get; set; } = string.Empty;
 
         [Required, MaxLength(100)]
-        public string ProductName { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [MaxLength(50)]
-        public string Barcode { get; set; }
+        public string? Barcode { get; set; }
 
-        [Required]
+        [Required, Column(TypeName = "decimal(10,2)")]
         public decimal Price { get; set; }
 
         [MaxLength(20)]
         public string Unit { get; set; } = "pcs";
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public string? CategoryId { get; set; }
+        [ForeignKey("CategoryId")]
+        public virtual Category? Category { get; set; }
 
-        // Quan hệ
-        public Category Category { get; set; }
-        public Supplier Supplier { get; set; }
-        public Inventory Inventory { get; set; }
-        public ICollection<OrderItem> OrderItems { get; set; }
+        public string? SupplierId { get; set; }
+        [ForeignKey("SupplierId")]
+        public virtual Supplier? Supplier { get; set; }
+
+        public virtual Inventory? Inventory { get; set; }
+        public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     }
 }

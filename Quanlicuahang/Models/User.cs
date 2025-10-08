@@ -1,28 +1,31 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using Mysqlx.Crud;
 using Quanlicuahang.Enum;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
     [Table("User")]
-    public class User
+    public class User : BasePrimary
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
+        
 
-        [Required, MaxLength(50)]
-        public string Username { get; set; }
+        [Required]
+        [MaxLength(50)]
+        public string Username { get; set; } = string.Empty;
 
-        [Required, MaxLength(255)]
-        public string Password { get; set; }
+        [Required]
+        [MaxLength(255)]
+        public string Password { get; set; } = string.Empty;
 
         [MaxLength(100)]
-        public string FullName { get; set; }
-        public List<Role> Role { get; set; } // admin / staff
+        public string? FullName { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [Required]
+        [MaxLength(20)]
+        public List<Role> Role { get; set; }  // admin / staff
 
-        
+        public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
     }
 }

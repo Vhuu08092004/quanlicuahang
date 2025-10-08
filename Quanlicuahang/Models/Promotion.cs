@@ -1,36 +1,40 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Mysqlx.Crud;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
     [Table("Promotion")]
-    public class Promotion
+    public class Promotion : BasePrimary
     {
-        [Key]
-        public int PromoId { get; set; }
-
-        [Required, MaxLength(50)]
-        public string PromoCode { get; set; }
+        [Required]
+        [MaxLength(50)]
+        public string Code { get; set; } = string.Empty;
 
         [MaxLength(255)]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
-        [Required]
-        public string DiscountType { get; set; } // percent / fixed
+        [Required, MaxLength(20)]
+        public string DiscountType { get; set; } = "percent"; 
 
-        [Required]
+        [Required, Column(TypeName = "decimal(10,2)")]
         public decimal DiscountValue { get; set; }
 
+        [Required]
         public DateTime StartDate { get; set; }
+
+        [Required]
         public DateTime EndDate { get; set; }
 
+        [Column(TypeName = "decimal(10,2)")]
         public decimal MinOrderAmount { get; set; } = 0;
+
         public int UsageLimit { get; set; } = 0;
         public int UsedCount { get; set; } = 0;
 
+        [Required, MaxLength(20)]
         public string Status { get; set; } = "active";
 
-        // Quan hệ
-        public ICollection<Order> Orders { get; set; }
+        public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
     }
 }
