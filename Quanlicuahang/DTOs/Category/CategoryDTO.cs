@@ -13,16 +13,37 @@ namespace Quanlicuahang.DTOs.Category
         public DateTime UpdatedAt { get; set; }
     }
 
+    public class CategorySearchDto
+    {
+        public int Skip { get; set; } = 0;
+        public int Take { get; set; } = 10;
+        public CategoryWhereDto? Where { get; set; }
+    }
+
+    public class CategoryWhereDto
+    {
+        public string? Code { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public bool? IsDeleted { get; set; }
+    }
+
+    public class CategoryIdDto
+    {
+        public string Id { get; set; } = string.Empty;
+    }
+
     public class CategoryCreateUpdateDto
     {
-        [Required]
-        [MaxLength(255)]
         public string Code { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(255)]
         public string Name { get; set; } = string.Empty;
-
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
     }
+
+    public class CategoryUpdateRequestDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public CategoryCreateUpdateDto Data { get; set; } = new();
+    }
+
 }
