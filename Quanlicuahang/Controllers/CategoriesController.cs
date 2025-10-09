@@ -15,7 +15,7 @@ namespace Quanlicuahang.Controllers
             _service = service;
         }
 
-        // POST: api/Categories/list
+        // POST: api/categories/pagination
         [HttpPost("pagination")]
         public async Task<IActionResult> GetCategories([FromBody] CategorySearchDto searchDto)
         {
@@ -23,7 +23,7 @@ namespace Quanlicuahang.Controllers
             return Ok(result);
         }
 
-        // POST: api/Categories/detail
+        // POST: api/categories/detail
         [HttpPost("detail")]
         public async Task<IActionResult> GetCategory([FromBody] CategoryIdDto dto)
         {
@@ -33,7 +33,7 @@ namespace Quanlicuahang.Controllers
             return Ok(category);
         }
 
-        // POST: api/Categories/create
+        // POST: api/categories/create
         [HttpPost("create")]
         public async Task<IActionResult> PostCategory([FromBody] CategoryCreateUpdateDto dto)
         {
@@ -41,7 +41,7 @@ namespace Quanlicuahang.Controllers
             return Ok(result);
         }
 
-        // POST: api/Categories/update
+        // POST: api/categories/update
         [HttpPost("update")]
         public async Task<IActionResult> PutCategory([FromBody] CategoryUpdateRequestDto dto)
         {
@@ -50,22 +50,22 @@ namespace Quanlicuahang.Controllers
             return Ok(new { message = "Cập nhật danh mục thành công." });
         }
 
-        // POST: api/Categories/delete
-        [HttpPost("delete")]
+        // POST: api/categories/deactive
+        [HttpPost("deactive")]
         public async Task<IActionResult> SoftDeleteCategory([FromBody] CategoryIdDto dto)
         {
             var success = await _service.SoftDeleteCategoryAsync(dto.Id);
             if (!success) return NotFound();
-            return Ok(new { message = "Xóa danh mục thành công." });
+            return Ok(new { message = "Ngưng hoạt động danh mục thành công." });
         }
 
-        // POST: api/Categories/restore
-        [HttpPost("restore")]
+        // POST: api/categories/active
+        [HttpPost("active")]
         public async Task<IActionResult> RestoreCategory([FromBody] CategoryIdDto dto)
         {
             var success = await _service.RestoreCategoryAsync(dto.Id);
             if (!success) return NotFound();
-            return Ok(new { message = "Danh mục đã được khôi phục." });
+            return Ok(new { message = "Kích hoạt danh mục thành công." });
         }
     }
 }
