@@ -7,7 +7,7 @@ namespace Quanlicuahang.Services
 {
     public interface ICategoryService
     {
-        Task<object> GetCategoriesAsync(string? search, int page, int pageSize, bool includeDeleted);
+        Task<object> GetCategoriesAsync(CategorySearchDto searchDto);
         Task<CategoryDto?> GetCategoryByIdAsync(string id);
         Task<CategoryDto> CreateCategoryAsync(CategoryCreateUpdateDto dto);
         Task<bool> UpdateCategoryAsync(string id, CategoryCreateUpdateDto dto);
@@ -24,27 +24,54 @@ namespace Quanlicuahang.Services
             _repository = repository;
         }
 
-        public async Task<object> GetCategoriesAsync(string? search, int page, int pageSize, bool includeDeleted)
+        public async Task<object> GetCategoriesAsync(CategorySearchDto searchDto)
         {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
+            var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
+            var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
 
-            var query = _repository.GetAll(includeDeleted);
+            // Lấy tất cả dữ liệu (bao gồm cả deleted nếu có điều kiện where.IsDeleted)
+            var query = _repository.GetAll(true);
 
-            if (!string.IsNullOrWhiteSpace(search))
+            // Áp dụng điều kiện where nếu có
+            if (searchDto.Where != null)
             {
-                search = search.Trim().ToLower();
-                query = query.Where(c =>
-                    c.Name.ToLower().Contains(search) ||
-                    c.Code.ToLower().Contains(search));
+                var where = searchDto.Where;
+
+                if (!string.IsNullOrWhiteSpace(where.Code))
+                {
+                    var code = where.Code.Trim().ToLower();
+                    query = query.Where(c => c.Code.ToLower().Contains(code));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.Name))
+                {
+                    var name = where.Name.Trim().ToLower();
+                    query = query.Where(c => c.Name.ToLower().Contains(name));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.Description))
+                {
+                    var description = where.Description.Trim().ToLower();
+                    query = query.Where(c => c.Description != null && c.Description.ToLower().Contains(description));
+                }
+
+                if (where.IsDeleted.HasValue)
+                {
+                    query = query.Where(c => c.IsDeleted == where.IsDeleted.Value);
+                }
+            }
+            else
+            {
+                var results = query.ToList();
+
             }
 
-            var totalRecords = await query.CountAsync();
+            var total = await query.CountAsync();
 
-            var items = await query
+            var data = await query
                 .OrderByDescending(c => c.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
+                .Skip(skip)
+                .Take(take)
                 .Select(c => new CategoryDto
                 {
                     Id = c.Id,
@@ -59,11 +86,11 @@ namespace Quanlicuahang.Services
 
             return new
             {
-                totalRecords,
-                page,
-                pageSize,
-                totalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
-                items
+                skip,
+                take,
+                data,
+                total
+
             };
         }
 

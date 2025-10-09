@@ -15,60 +15,55 @@ namespace Quanlicuahang.Controllers
             _service = service;
         }
 
-        // GET: api/Categories
-        [HttpGet]
-        public async Task<IActionResult> GetCategories(
-            string? search = null,
-            int page = 1,
-            int pageSize = 10,
-            bool includeDeleted = false)
+        // POST: api/Categories/list
+        [HttpPost("pagination")]
+        public async Task<IActionResult> GetCategories([FromBody] CategorySearchDto searchDto)
         {
-            var result = await _service.GetCategoriesAsync(search, page, pageSize, includeDeleted);
+            var result = await _service.GetCategoriesAsync(searchDto);
             return Ok(result);
         }
 
-        // GET: api/Categories/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetCategory(string id)
+        // POST: api/Categories/detail
+        [HttpPost("detail")]
+        public async Task<IActionResult> GetCategory([FromBody] CategoryIdDto dto)
         {
-            var category = await _service.GetCategoryByIdAsync(id);
+            var category = await _service.GetCategoryByIdAsync(dto.Id);
             if (category == null)
                 return NotFound();
-
             return Ok(category);
         }
 
-        // POST: api/Categories
-        [HttpPost]
-        public async Task<IActionResult> PostCategory(CategoryCreateUpdateDto dto)
+        // POST: api/Categories/create
+        [HttpPost("create")]
+        public async Task<IActionResult> PostCategory([FromBody] CategoryCreateUpdateDto dto)
         {
             var result = await _service.CreateCategoryAsync(dto);
-            return CreatedAtAction(nameof(GetCategory), new { id = result.Id }, result);
+            return Ok(result);
         }
 
-        // PUT: api/Categories/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutCategory(string id, CategoryCreateUpdateDto dto)
+        // POST: api/Categories/update
+        [HttpPost("update")]
+        public async Task<IActionResult> PutCategory([FromBody] CategoryUpdateRequestDto dto)
         {
-            var success = await _service.UpdateCategoryAsync(id, dto);
+            var success = await _service.UpdateCategoryAsync(dto.Id, dto.Data);
             if (!success) return NotFound();
-            return NoContent();
+            return Ok(new { message = "Cập nhật danh mục thành công." });
         }
 
-        // DELETE: api/Categories/{id} (Soft delete)
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> SoftDeleteCategory(string id)
+        // POST: api/Categories/delete
+        [HttpPost("delete")]
+        public async Task<IActionResult> SoftDeleteCategory([FromBody] CategoryIdDto dto)
         {
-            var success = await _service.SoftDeleteCategoryAsync(id);
+            var success = await _service.SoftDeleteCategoryAsync(dto.Id);
             if (!success) return NotFound();
-            return NoContent();
+            return Ok(new { message = "Xóa danh mục thành công." });
         }
 
-        // PUT: api/Categories/restore/{id}
-        [HttpPut("restore/{id}")]
-        public async Task<IActionResult> RestoreCategory(string id)
+        // POST: api/Categories/restore
+        [HttpPost("restore")]
+        public async Task<IActionResult> RestoreCategory([FromBody] CategoryIdDto dto)
         {
-            var success = await _service.RestoreCategoryAsync(id);
+            var success = await _service.RestoreCategoryAsync(dto.Id);
             if (!success) return NotFound();
             return Ok(new { message = "Danh mục đã được khôi phục." });
         }
