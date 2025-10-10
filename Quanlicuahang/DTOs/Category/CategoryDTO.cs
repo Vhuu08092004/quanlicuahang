@@ -2,15 +2,14 @@
 
 namespace Quanlicuahang.DTOs.Category
 {
-    public class CategoryDto
+    public class CategoryDto : BaseDto
     {
         public string Id { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public bool IsDeleted { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public EntityActionDto Actions { get; set; } = new();
+
     }
 
     public class CategorySearchDto
@@ -18,6 +17,7 @@ namespace Quanlicuahang.DTOs.Category
         public int Skip { get; set; } = 0;
         public int Take { get; set; } = 10;
         public CategoryWhereDto? Where { get; set; }
+
     }
 
     public class CategoryWhereDto

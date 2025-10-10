@@ -41,7 +41,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-
+builder.Services.AddHttpContextAccessor();
 // ---------------------- DATABASE CONFIG ----------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -66,9 +66,10 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+} else {
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 
 // ✅ Enable CORS before authentication & authorization
 app.UseCors("AllowReactApp");
