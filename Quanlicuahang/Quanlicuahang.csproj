@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Folder Include="Exception\" />
+    <Folder Include="Mapper\" />
   </ItemGroup>
 
 </Project>

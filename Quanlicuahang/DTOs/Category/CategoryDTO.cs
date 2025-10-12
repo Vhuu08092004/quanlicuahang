@@ -1,14 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace Quanlicuahang.DTOs.Category
+﻿namespace Quanlicuahang.DTOs.Category
 {
     public class CategoryDto : BaseDto
     {
-        public string Id { get; set; } = string.Empty;
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public EntityActionDto Actions { get; set; } = new();
 
     }
 
@@ -28,22 +24,20 @@ namespace Quanlicuahang.DTOs.Category
         public bool? IsDeleted { get; set; }
     }
 
-    public class CategoryIdDto
-    {
-        public string Id { get; set; } = string.Empty;
-    }
+
 
     public class CategoryCreateUpdateDto
     {
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
+        public string Description { get; set; } = string.Empty;
     }
 
-    public class CategoryUpdateRequestDto
+    public class CategorySelectBoxDto
     {
-        public string Id { get; set; } = string.Empty;
-        public CategoryCreateUpdateDto Data { get; set; } = new();
+        public string Value { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 
 }

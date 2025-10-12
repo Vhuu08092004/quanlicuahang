@@ -1,61 +1,58 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.Data;
-using Quanlicuahang.Enum;
 using Quanlicuahang.Models;
 
 namespace Quanlicuahang.Repositories
 {
-    public interface IUserRepository
+    public interface IUserRepository : IBaseRepository<User>
     {
-        Task<IEnumerable<User>> GetAllAsync();
-        Task<User?> GetByIdAsync(string id);
-        Task<User> AddAsync(User user);
-        Task<User> UpdateAsync(User user);
-        Task DeleteAsync(User user);
+        Task<User?> GetByUsernameAsync(string username);
+        Task AddUserWithDefaultRoleAsync(User user, string defaultRoleName = "Staff");
+        Task<User?> GetByIdWithRolesAsync(string id);  
     }
 
-    public class UserRepository : IUserRepository
+    public class UserRepository : BaseRepository<User>, IUserRepository
     {
-        private readonly ApplicationDbContext _context;
-
-        public UserRepository(ApplicationDbContext context)
+        public UserRepository(ApplicationDbContext context) : base(context)
         {
-            _context = context;
         }
 
-        public async Task<IEnumerable<User>> GetAllAsync()
+        public async Task<User?> GetByUsernameAsync(string username)
         {
-            return await _context.Users.ToListAsync();
+            return await _dbSet
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted);
         }
 
-        public async Task<User?> GetByIdAsync(string id)
+        public async Task<User?> GetByIdWithRolesAsync(string id)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            return await _dbSet
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
         }
 
-        public async Task<User> AddAsync(User user)
+
+        public async Task AddUserWithDefaultRoleAsync(User user, string defaultRoleName = "Staff")
         {
-            if (user.Role == null || !user.Role.Any())
+            await _dbSet.AddAsync(user);
+            await _context.SaveChangesAsync();
+
+            if (!user.UserRoles.Any())
             {
-                user.Role = new List<Role> { Role.Staff };
+                var role = await _context.Roles.FirstOrDefaultAsync(r => r.Name == defaultRoleName);
+                if (role != null)
+                {
+                    var userRole = new UserRole
+                    {
+                        UserId = user.Id,
+                        RoleId = role.Id
+                    };
+                    await _context.UserRoles.AddAsync(userRole);
+                    await _context.SaveChangesAsync();
+                }
             }
-
-            var entityEntry = await _context.Users.AddAsync(user);
-            await _context.SaveChangesAsync();
-            return entityEntry.Entity;
-        }
-
-        public async Task<User> UpdateAsync(User user)
-        {
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
-            return user;
-        }
-
-        public async Task DeleteAsync(User user)
-        {
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
         }
     }
 }

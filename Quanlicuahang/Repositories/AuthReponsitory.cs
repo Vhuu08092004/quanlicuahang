@@ -20,7 +20,10 @@ namespace Quanlicuahang.Repositories
 
         public async Task<User?> GetUserByUsernameAsync(string username)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+            return await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted);
         }
     }
 }

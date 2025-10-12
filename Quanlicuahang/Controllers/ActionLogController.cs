@@ -4,7 +4,7 @@ using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/action_log")]
     [ApiController]
     public class ActionLogsController : ControllerBase
     {
@@ -15,7 +15,6 @@ namespace Quanlicuahang.Controllers
             _logService = logService;
         }
 
-        // ✅ POST: api/actionlogs/pagination
         [HttpPost("pagination")]
         public async Task<IActionResult> GetLogs([FromBody] ActionLogSearchDto searchDto)
         {

@@ -1,6 +1,5 @@
 ﻿namespace Quanlicuahang.DTOs.Report
 {
-    // Input DTOs cho các báo cáo
     public class DayRevenueInputDto
     {
         public DateTime Date { get; set; }
