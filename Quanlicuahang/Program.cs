@@ -3,8 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Quanlicuahang.Data;
 using Quanlicuahang.Exception;
-using Quanlicuahang.Repositories;
-using Quanlicuahang.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +13,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000") // React app
+            .WithOrigins("http://localhost:3000")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -24,34 +22,50 @@ builder.Services.AddCors(options =>
 
 // ---------------------- JWT CONFIG ----------------------
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!);
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ClockSkew = TimeSpan.Zero,
+        NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier,
+        RoleClaimType = System.Security.Claims.ClaimTypes.Role
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = ctx =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-    });
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = ctx =>
+        {
+            return Task.CompletedTask;
+        }
+    };
+});
 
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
+
 // ---------------------- DATABASE CONFIG ----------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // ---------------------- APP SERVICES ----------------------
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddApplicationServices();
-
 builder.Services.AddControllers();
 
 // ---------------------- SWAGGER ----------------------
@@ -66,20 +80,15 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-} else {
+}
+else
+{
     app.UseHttpsRedirection();
 }
 
-
-// ✅ Enable CORS before authentication & authorization
 app.UseCors("AllowReactApp");
-
-// ✅ Enable Authentication middleware
 app.UseAuthentication();
-
-// ✅ Enable Authorization middleware
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

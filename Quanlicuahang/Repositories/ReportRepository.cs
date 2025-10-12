@@ -1,11 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
 using Quanlicuahang.Data;
-using Quanlicuahang.Models;
 
 namespace Quanlicuahang.Repositories
 {

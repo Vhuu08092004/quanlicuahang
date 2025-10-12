@@ -44,7 +44,17 @@ namespace Quanlicuahang.Services
             string? ip,
             string? userAgent)
         {
-            
+            try
+            {
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    var userExists = await _context.Users.AnyAsync(u => u.Id == userId && !u.IsDeleted);
+                    if (!userExists)
+                    {
+                        userId = null;
+                    }
+                }
+
                 var log = new ActionLog
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -58,14 +68,20 @@ namespace Quanlicuahang.Services
                     UserId = userId,
                     IpAddress = ip,
                     UserAgent = userAgent,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = userId ?? "SYSTEM",
+                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedBy = userId ?? "SYSTEM"
                 };
 
                 _context.ActionLogs.Add(log);
                 await _context.SaveChangesAsync();
-        }
-
-        public async Task<object> GetLogsAsync(ActionLogSearchDto searchDto)
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($"Failed to log action: {ex.Message}");
+            }
+        }        public async Task<object> GetLogsAsync(ActionLogSearchDto searchDto)
         {
             var query = _context.ActionLogs
                 .Include(l => l.User)

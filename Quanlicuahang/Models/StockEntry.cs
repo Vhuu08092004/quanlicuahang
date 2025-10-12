@@ -19,7 +19,7 @@ namespace Quanlicuahang.Models
         public DateTime EntryDate { get; set; } = DateTime.UtcNow;
 
         [MaxLength(20)]
-        public string Status { get; set; } = "pending"; // pending, completed, cancelled
+        public string Status { get; set; } = "pending";
 
         [Column(TypeName = "decimal(10,2)")]
         public decimal TotalCost { get; set; }

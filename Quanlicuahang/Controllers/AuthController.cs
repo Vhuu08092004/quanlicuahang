@@ -16,6 +16,9 @@ namespace Quanlicuahang.Controllers
             _authService = authService;
         }
 
+
+
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -24,12 +27,6 @@ namespace Quanlicuahang.Controllers
                 return Unauthorized(new { message = "Invalid username or password" });
 
             return Ok(result);
-        }
-
-        [HttpPost("logout")]
-        public IActionResult Logout()
-        {
-            return Ok(new { message = "Logged out successfully" });
         }
 
         [HttpPost("refresh")]
@@ -46,20 +43,27 @@ namespace Quanlicuahang.Controllers
         [HttpGet("profile")]
         public async Task<IActionResult> GetProfile()
         {
-            var username = User.Identity?.Name;
-            if (string.IsNullOrEmpty(username))
-                return Unauthorized();
-
-            var user = await _authService.GetProfileAsync(username);
+            var userId = User.Identity?.Name;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "Không xác định được người dùng!" });
+            var user = await _authService.GetProfileByIdAsync(userId);
             if (user == null)
-                return NotFound();
+                return NotFound(new { message = "Không tìm thấy người dùng!" });
 
             return Ok(new
             {
+                user.Id,
                 user.Username,
                 user.FullName,
-                user.Role
+                Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList()
             });
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            return Ok(new { message = "Đăng xuất thành công!" });
         }
     }
 }

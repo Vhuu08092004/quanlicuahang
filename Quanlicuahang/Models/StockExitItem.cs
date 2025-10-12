@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
-    // Entity chi tiết xuất kho
     [Table("StockExitItem")]
     public class StockExitItem : BasePrimary
     {

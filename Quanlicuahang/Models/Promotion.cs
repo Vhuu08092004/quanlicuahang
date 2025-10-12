@@ -15,7 +15,7 @@ namespace Quanlicuahang.Models
         public string? Description { get; set; }
 
         [Required, MaxLength(20)]
-        public string DiscountType { get; set; } = "percent"; 
+        public string DiscountType { get; set; } = "percent";
 
         [Required, Column(TypeName = "decimal(10,2)")]
         public decimal DiscountValue { get; set; }

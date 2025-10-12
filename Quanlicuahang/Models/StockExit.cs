@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
-    // Entity xuất kho (hủy hàng, trả hàng, ...)
     [Table("StockExit")]
     public class StockExit : BasePrimary
     {
@@ -13,7 +12,7 @@ namespace Quanlicuahang.Models
 
         [Required]
         [MaxLength(50)]
-        public string ExitType { get; set; } = "damage"; // damage, return, transfer, other
+        public string ExitType { get; set; } = "damage"; 
 
         [Required]
         public DateTime ExitDate { get; set; } = DateTime.UtcNow;

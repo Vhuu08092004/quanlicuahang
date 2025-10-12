@@ -2,10 +2,10 @@
 {
     public class ActionLogFilterDto
     {
-        public string? FunctionType { get; set; }  // EntityType
-        public string? FunctionId { get; set; }    // EntityId
-        public string? Type { get; set; }          // Action
-        public string? CreatedBy { get; set; }     // UserId
+        public string? FunctionType { get; set; } 
+        public string? FunctionId { get; set; }  
+        public string? Type { get; set; }      
+        public string? CreatedBy { get; set; }   
     }
 
     public class ActionLogSearchDto

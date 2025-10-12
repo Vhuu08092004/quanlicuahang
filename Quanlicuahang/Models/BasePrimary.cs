@@ -5,7 +5,7 @@ namespace Quanlicuahang.Models
     public class BasePrimary
     {
         [Key]
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Id { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string CreatedBy { get; set; } = string.Empty;
