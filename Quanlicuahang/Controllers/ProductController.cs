@@ -1,13 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Quanlicuahang.DTOs.Product;
 using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
 {
-    [ApiController]
     [Route("api/product")]
-    [Authorize]
+    [ApiController]
     public class ProductController : ControllerBase
     {
         private readonly IProductService _service;
@@ -17,98 +15,56 @@ namespace Quanlicuahang.Controllers
             _service = service;
         }
 
-
         [HttpPost("pagination")]
-        public async Task<IActionResult> GetAllProducts([FromBody] ProductSearchDto searchDto)
+        public async Task<IActionResult> GetAll([FromBody] ProductSearchDto searchDto)
         {
-            try
-            {
-                var result = await _service.GetAllAsync(searchDto);
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _service.GetAllAsync(searchDto);
+            return Ok(result);
         }
 
         [HttpGet("find_by_id/{id}")]
         public async Task<IActionResult> GetById(string id)
         {
-            try
-            {
-                var result = await _service.GetByIdAsync(id);
-                if (result == null)
-                    return NotFound("Sản phẩm không tồn tại");
-
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _service.GetByIdAsync(id);
+            if (result == null) return NotFound("Không tìm thấy sản phẩm");
+            return Ok(result);
         }
 
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] ProductCreateUpdateDto dto)
         {
-            try
-            {
-                var result = await _service.CreateAsync(dto);
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _service.CreateAsync(dto);
+            return Ok(result);
         }
 
-        [HttpPut("update/{id}")]
-        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] ProductCreateUpdateDto dto)
+        [HttpPost("update/{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] ProductCreateUpdateDto dto)
         {
-            try
-            {
-                var result = await _service.UpdateAsync(id, dto);
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _service.UpdateAsync(id, dto);
+            return Ok(result);
         }
 
         [HttpPost("deactive/{id}")]
-        public async Task<IActionResult> DeActive([FromRoute] string id)
+        public async Task<IActionResult> DeActive(string id)
         {
-            try
-            {
-                var result = await _service.DeActiveAsync(id);
-                if (!result)
-                    return NotFound("Sản phẩm không tồn tại");
-
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _service.DeActiveAsync(id);
+            if (!result) return NotFound("Không tìm thấy sản phẩm");
+            return Ok("Vô hiệu hóa sản phẩm thành công");
         }
 
         [HttpPost("active/{id}")]
-        public async Task<IActionResult> Active([FromRoute] string id)
+        public async Task<IActionResult> Active(string id)
         {
-            try
-            {
-                var result = await _service.ActiveAsync(id);
-                if (!result)
-                    return NotFound("Sản phẩm không tồn tại");
+            var result = await _service.ActiveAsync(id);
+            if (!result) return NotFound("Không tìm thấy sản phẩm");
+            return Ok("Kích hoạt sản phẩm thành công");
+        }
 
-                return Ok(result);
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+        [HttpGet("select_box")]
+        public async Task<IActionResult> GetSelectBox()
+        {
+            var result = await _service.GetSelectBoxAsync();
+            return Ok(result);
         }
     }
 }

@@ -12,11 +12,8 @@ namespace Quanlicuahang.Repositories
 
     public class UserRoleRepository : BaseRepository<UserRole>, IUserRoleRepository
     {
-        private readonly ApplicationDbContext _context;
-
         public UserRoleRepository(ApplicationDbContext context) : base(context)
         {
-            _context = context;
         }
 
         public async Task AddUserRoleAsync(string userId, string roleId)

@@ -15,7 +15,7 @@ namespace Quanlicuahang.Services
         Task<bool> UpdateAsync(string id, CategoryCreateUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
-        Task<object> GetSelectBoxActiveAsync();
+        Task<object> GetSelectBoxAsync();
 
     }
 
@@ -23,19 +23,22 @@ namespace Quanlicuahang.Services
     {
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
-        private readonly ICategoryRepository _repo;
         private readonly ITokenHelper _tokenHelper;
+        private readonly ICategoryRepository _repo;
+
 
         public CategoryService(
             IActionLogService logService,
             IHttpContextAccessor httpContext,
-            ICategoryRepository repository,
-            ITokenHelper tokenHelper)
+             ITokenHelper tokenHelper,
+            ICategoryRepository repository
+           )
         {
             _logService = logService;
             _httpContext = httpContext;
-            _repo = repository;
             _tokenHelper = tokenHelper;
+            _repo = repository;
+
         }
 
         public async Task<object> GetAllAsync(CategorySearchDto searchDto)
@@ -315,7 +318,7 @@ namespace Quanlicuahang.Services
             return true;
         }
 
-        public async Task<object> GetSelectBoxActiveAsync()
+        public async Task<object> GetSelectBoxAsync()
         {
             var query = _repo.GetAll(false)
                 .OrderBy(c => c.Name)

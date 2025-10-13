@@ -32,15 +32,15 @@ namespace Quanlicuahang.Exception
             /*PRODUCT*/
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductService, ProductService>();
+
             /*PRODUCT ATTRIBUTE*/
             services.AddScoped<IProductAttributeRepository, ProductAttributeRepository>();
             services.AddScoped<IProductAttributeService, ProductAttributeService>();
-            /*PRODUCT VARIANT*/
-            services.AddScoped<IProductVariantRepository, ProductVariantRepository>();
-            services.AddScoped<IProductVariantService, ProductVariantService>();
 
+            /*PRODUCT ATTRIBUTE VALUE*/
+            services.AddScoped<IProductAttributeValueRepository, ProductAttributeValueRepository>();
+            services.AddScoped<IProductAttributeValueService, ProductAttributeValueService>();
 
-            services.AddScoped<IProductVariantAttributeValueRepository, ProductVariantAttributeValueRepository>();
 
             services.AddScoped<IUserTokenRepository, UserTokenRepository>();
             services.AddScoped<ITokenHelper, TokenHelper>();

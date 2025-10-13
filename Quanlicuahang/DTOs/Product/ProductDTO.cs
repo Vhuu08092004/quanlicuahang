@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.DTOs.ProductVariant;
+﻿using Quanlicuahang.DTOs.ProductAttribute;
 
 namespace Quanlicuahang.DTOs.Product
 {
@@ -13,7 +13,8 @@ namespace Quanlicuahang.DTOs.Product
         public string? CategoryName { get; set; }
         public string? SupplierId { get; set; }
         public string? SupplierName { get; set; }
-        public List<ProductVariantDto> Variants { get; set; } = new();
+
+        public List<ProductAttributeValueDto> Attributes { get; set; } = new();
     }
 
     public class ProductCreateUpdateDto
@@ -25,6 +26,9 @@ namespace Quanlicuahang.DTOs.Product
         public string Unit { get; set; } = "pcs";
         public string? CategoryId { get; set; }
         public string? SupplierId { get; set; }
+
+        public List<ProductAttributeValueCreateUpdateDto> Attributes { get; set; } = new();
+
     }
 
     public class ProductSearchDto : BaseSearchDto
@@ -40,5 +44,7 @@ namespace Quanlicuahang.DTOs.Product
         public string? SupplierId { get; set; }
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
+
+        public bool? IsDeleted { get; set; }
     }
 }

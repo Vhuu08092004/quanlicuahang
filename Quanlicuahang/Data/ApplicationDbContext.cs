@@ -19,8 +19,6 @@ namespace Quanlicuahang.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductAttribute> ProductAttributes { get; set; }
         public DbSet<ProductAttributeValue> ProductAttributeValues { get; set; }
-        public DbSet<ProductVariantAttributeValue> ProductVariantAttributeValues { get; set; }
-        public DbSet<ProductVariant> ProductVariants { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<Inventory> Inventories { get; set; }
@@ -77,29 +75,6 @@ namespace Quanlicuahang.Data
                 .HasForeignKey(p => p.SupplierId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            modelBuilder.Entity<ProductVariant>()
-                .HasOne(pv => pv.Product)
-                .WithMany(p => p.Variants)
-                .HasForeignKey(pv => pv.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ProductAttributeValue>()
-                .HasOne(pav => pav.Attribute)
-                .WithMany(pa => pa.AttributeValues)
-                .HasForeignKey(pav => pav.AttributeId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ProductVariantAttributeValue>()
-                .HasOne(pvav => pvav.ProductVariant)
-                .WithMany(pv => pv.VariantValues)
-                .HasForeignKey(pvav => pvav.ProductVariantId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ProductVariantAttributeValue>()
-                .HasOne(pvav => pvav.AttributeValue)
-                .WithMany(pav => pav.VariantValues)
-                .HasForeignKey(pvav => pvav.AttributeValueId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Inventory>()
                 .HasOne(i => i.Product)
@@ -137,11 +112,7 @@ namespace Quanlicuahang.Data
                 .HasForeignKey(oi => oi.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<OrderItem>()
-                .HasOne(oi => oi.ProductVariant)
-                .WithMany()
-                .HasForeignKey(oi => oi.ProductVariantId)
-                .OnDelete(DeleteBehavior.SetNull);
+
 
             modelBuilder.Entity<Payment>()
                 .HasOne(p => p.Order)
@@ -220,7 +191,7 @@ namespace Quanlicuahang.Data
                 .WithMany(u => u.ActionLogs)
                 .HasForeignKey(al => al.UserId)
                 .OnDelete(DeleteBehavior.SetNull)
-                .IsRequired(false); 
+                .IsRequired(false);
 
 
             modelBuilder.Entity<User>()
@@ -242,8 +213,8 @@ namespace Quanlicuahang.Data
                 .HasIndex(o => o.Code)
                 .IsUnique();
 
-            var adminRoleId = GenerateCode("ROLE");      
-            var adminUserId = GenerateCode("USER");     
+            var adminRoleId = GenerateCode("ROLE");
+            var adminUserId = GenerateCode("USER");
             var userRoleId = GenerateCode("USERROLE");
             var now = DateTime.UtcNow;
             var adminPassword = HashPassword("admin123@");
