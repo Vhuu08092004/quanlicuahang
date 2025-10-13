@@ -28,12 +28,11 @@ public class Product : BasePrimary
     [ForeignKey(nameof(SupplierId))]
     public virtual Supplier? Supplier { get; set; }
 
-    public virtual ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
-
     public virtual ICollection<Inventory> Inventories { get; set; } = new List<Inventory>();
-
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     public virtual ICollection<ReturnItem> ReturnItems { get; set; } = new List<ReturnItem>();
     public virtual ICollection<StockEntryItem> StockEntryItems { get; set; } = new List<StockEntryItem>();
     public virtual ICollection<StockExitItem> StockExitItems { get; set; } = new List<StockExitItem>();
+
+    public virtual ICollection<ProductAttributeValue> AttributeValues { get; set; } = new List<ProductAttributeValue>();
 }

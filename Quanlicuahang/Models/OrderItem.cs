@@ -16,10 +16,6 @@ namespace Quanlicuahang.Models
         [ForeignKey("ProductId")]
         public virtual Product Product { get; set; } = null!;
 
-        public string? ProductVariantId { get; set; }
-        [ForeignKey("ProductVariantId")]
-        public virtual ProductVariant? ProductVariant { get; set; }
-
         [Required]
         public int Quantity { get; set; }
         [Required, Column(TypeName = "decimal(10,2)")]

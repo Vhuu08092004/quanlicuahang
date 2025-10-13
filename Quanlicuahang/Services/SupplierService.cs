@@ -15,7 +15,7 @@ namespace Quanlicuahang.Services
         Task<bool> UpdateAsync(string id, SupplierCreateUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
-        Task<object> GetSelectBoxActiveAsync();
+        Task<object> GetSelectBoxAsync();
 
     }
 
@@ -344,7 +344,7 @@ namespace Quanlicuahang.Services
             return true;
         }
 
-        public async Task<object> GetSelectBoxActiveAsync()
+        public async Task<object> GetSelectBoxAsync()
         {
             var query = _repo.GetAll(false)
                 .OrderBy(s => s.Name)

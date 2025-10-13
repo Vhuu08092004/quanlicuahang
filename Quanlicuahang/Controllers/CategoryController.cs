@@ -118,7 +118,7 @@ namespace Quanlicuahang.Controllers
         {
             try
             {
-                var result = await _service.GetSelectBoxActiveAsync();
+                var result = await _service.GetSelectBoxAsync();
                 return Ok(result);
             }
             catch (System.Exception ex)

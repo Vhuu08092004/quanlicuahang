@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Quanlicuahang.DTOs;
 using Quanlicuahang.DTOs.ProductAttribute;
 using Quanlicuahang.Helpers;
 using Quanlicuahang.Repositories;
@@ -10,23 +11,29 @@ namespace Quanlicuahang.Services
         Task<object> GetAllAsync(ProductAttributeSearchDto searchDto);
         Task<ProductAttributeDto?> GetByIdAsync(string id);
         Task<ProductAttributeDto> CreateAsync(ProductAttributeCreateUpdateDto dto);
-        Task<ProductAttributeDto> UpdateAsync(string id, ProductAttributeCreateUpdateDto dto);
+        Task<bool> UpdateAsync(string id, ProductAttributeCreateUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
+        Task<object> GetSelectBoxAsync();
     }
 
     public class ProductAttributeService : IProductAttributeService
     {
         private readonly IProductAttributeRepository _repo;
+        private readonly IProductAttributeValueRepository _attributeValueRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
 
         public ProductAttributeService(
-            ITokenHelper tokenHelper,
-            IProductAttributeRepository repo, IActionLogService logService, IHttpContextAccessor httpContext)
+            IProductAttributeRepository repo,
+            IProductAttributeValueRepository attributeValueRepo,
+            IActionLogService logService,
+            IHttpContextAccessor httpContext,
+            ITokenHelper tokenHelper)
         {
             _repo = repo;
+            _attributeValueRepo = attributeValueRepo;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -34,57 +41,34 @@ namespace Quanlicuahang.Services
 
         public async Task<object> GetAllAsync(ProductAttributeSearchDto searchDto)
         {
-            var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
-            var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
-
             var query = _repo.GetAll(true);
 
             if (searchDto.Where != null)
             {
                 var where = searchDto.Where;
-
                 if (!string.IsNullOrWhiteSpace(where.Code))
-                {
-                    var code = where.Code.Trim().ToLower();
-                    query = query.Where(c => c.Code.ToLower().Contains(code));
-                }
-
+                    query = query.Where(a => a.Code.ToLower().Contains(where.Code.Trim().ToLower()));
                 if (!string.IsNullOrWhiteSpace(where.Name))
-                {
-                    var name = where.Name.Trim().ToLower();
-                    query = query.Where(c => c.Name.ToLower().Contains(name));
-                }
-
+                    query = query.Where(a => a.Name.ToLower().Contains(where.Name.Trim().ToLower()));
                 if (!string.IsNullOrWhiteSpace(where.Description))
-                {
-                    var description = where.Description.Trim().ToLower();
-                    query = query.Where(c => c.Description != null && c.Description.ToLower().Contains(description));
-                }
-
+                    query = query.Where(a => a.Description != null && a.Description.ToLower().Contains(where.Description.Trim().ToLower()));
                 if (where.IsDeleted.HasValue)
-                {
-                    query = query.Where(c => c.IsDeleted == where.IsDeleted.Value);
-                }
+                    query = query.Where(a => a.IsDeleted == where.IsDeleted.Value);
             }
+
             var total = await query.CountAsync();
             var data = await query
-                .OrderByDescending(pa => pa.CreatedAt)
-                .Skip(searchDto.Skip)
-                .Take(searchDto.Take)
-                .Select(pa => new ProductAttributeDto
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => new ProductAttributeDto
                 {
-                    Id = pa.Id,
-                    Code = pa.Code,
-                    Name = pa.Name,
-                    Description = pa.Description,
-                    IsDeleted = pa.IsDeleted,
-                    CreatedAt = pa.CreatedAt,
-                    UpdatedAt = pa.UpdatedAt,
-                    isCanView = true,
-                    isCanCreate = true,
-                    isCanEdit = !pa.IsDeleted,
-                    isCanDeActive = !pa.IsDeleted,
-                    isCanActive = pa.IsDeleted
+                    Id = a.Id,
+                    Code = a.Code,
+                    Name = a.Name,
+                    Description = a.Description,
+                    DataType = a.DataType,
+                    IsDeleted = a.IsDeleted,
+                    CreatedAt = a.CreatedAt,
+                    UpdatedAt = a.UpdatedAt
                 })
                 .ToListAsync();
 
@@ -95,15 +79,17 @@ namespace Quanlicuahang.Services
         {
             var attribute = await _repo.GetAll(true)
                 .Include(a => a.AttributeValues)
-                .Where(a => a.Id == id)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(a => a.Id == id);
+
             if (attribute == null) return null;
-            var productAttribute = new ProductAttributeDto
+
+            return new ProductAttributeDto
             {
                 Id = attribute.Id,
                 Code = attribute.Code,
                 Name = attribute.Name,
                 Description = attribute.Description,
+                DataType = attribute.DataType,
                 AttributeValues = attribute.AttributeValues
                     .Where(av => !av.IsDeleted)
                     .OrderBy(av => av.DisplayOrder)
@@ -112,7 +98,12 @@ namespace Quanlicuahang.Services
                         Id = av.Id,
                         AttributeId = av.AttributeId,
                         AttributeName = attribute.Name,
-                        Value = av.Value,
+                        AttributeCode = attribute.Code,
+                        ValueString = av.ValueString,
+                        ValueDecimal = av.ValueDecimal,
+                        ValueInt = av.ValueInt,
+                        ValueBool = av.ValueBool,
+                        ValueDate = av.ValueDate,
                         DisplayOrder = av.DisplayOrder,
                         IsDeleted = av.IsDeleted,
                         CreatedAt = av.CreatedAt,
@@ -123,128 +114,128 @@ namespace Quanlicuahang.Services
                 CreatedAt = attribute.CreatedAt,
                 UpdatedAt = attribute.UpdatedAt
             };
-
-            return productAttribute;
         }
-
 
         public async Task<ProductAttributeDto> CreateAsync(ProductAttributeCreateUpdateDto dto)
         {
-            if (await _repo.ExistsAsync(p => p.Code == dto.Code))
-                throw new System.Exception($"Mã thuộc tính sản phẩm'{dto.Code}' đã tồn tại!");
+            if (await _repo.ExistsAsync(a => a.Code == dto.Code))
+                throw new UnauthorizedAccessException($"Mã thuộc tính '{dto.Code}' đã tồn tại!");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
-            {
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-            }
+                throw new UnauthorizedAccessException("Không thể xác định người dùng.");
+
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
 
-            var productattr = new ProductAttribute
+            var attr = new ProductAttribute
             {
                 Id = Guid.NewGuid().ToString(),
                 Code = dto.Code,
                 Name = dto.Name,
                 Description = dto.Description,
-                CreatedBy = userId,
+                DataType = dto.DataType,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                UpdatedBy = userId
             };
 
-            await _repo.AddAsync(productattr);
+            await _repo.AddAsync(attr);
             await _repo.SaveChangesAsync();
 
             await _logService.LogAsync(
                 code: Guid.NewGuid().ToString(),
                 action: "Create",
                 entityType: "ProductAttributes",
-                entityId: productattr.Id,
-                description: $"Tạo mới thuộc tính sản phẩm {productattr.Code} - {productattr.Name}",
+                entityId: attr.Id,
+                description: $"Tạo mới thuộc tính {attr.Name}",
                 oldValue: null,
-                newValue: productattr,
+                newValue: attr,
                 userId: userId,
-                 ip: ip,
-                userAgent: agent);
+                ip: ip,
+                userAgent: agent
+            );
 
-            return (await GetByIdAsync(productattr.Id))!;
+            return await GetByIdAsync(attr.Id) ?? throw new UnauthorizedAccessException("Tạo thuộc tính thất bại");
         }
 
-        public async Task<ProductAttributeDto> UpdateAsync(string id, ProductAttributeCreateUpdateDto dto)
+        public async Task<bool> UpdateAsync(string id, ProductAttributeCreateUpdateDto dto)
         {
-            var productattr = await _repo.GetByIdAsync(id);
-            if (productattr == null)
-                throw new System.Exception("Thuộc tính sản phẩm không tồn tại");
+            var attr = await _repo.GetByIdAsync(id) ?? throw new UnauthorizedAccessException("Thuộc tính không tồn tại");
 
-            if (await _repo.ExistsAsync(p => p.Code == dto.Code, id))
-                throw new System.Exception($"Mã thuộc tính '{dto.Code}' đã tồn tại");
+            if (await _repo.ExistsAsync(a => a.Code == dto.Code, id))
+                throw new UnauthorizedAccessException($"Mã thuộc tính '{dto.Code}' đã tồn tại!");
 
-            var oldValue = new { productattr.Code, productattr.Name };
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
-            {
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-            }
+                throw new UnauthorizedAccessException("Không thể xác định người dùng.");
+
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
-            productattr.Code = dto.Code;
-            productattr.Name = dto.Name;
-            productattr.Description = dto.Description;
-            productattr.UpdatedBy = userId;
-            productattr.UpdatedAt = DateTime.UtcNow;
 
-            _repo.Update(productattr);
+            var oldValue = new
+            {
+                attr.Code,
+                attr.Name,
+                attr.Description,
+                attr.DataType
+            };
+
+            attr.Code = dto.Code;
+            attr.Name = dto.Name;
+            attr.Description = dto.Description;
+            attr.DataType = dto.DataType;
+            attr.UpdatedAt = DateTime.UtcNow;
+            attr.UpdatedBy = userId;
+
+            _repo.Update(attr);
             await _repo.SaveChangesAsync();
 
             await _logService.LogAsync(
-               code: Guid.NewGuid().ToString(),
-                action: "DeActive",
+                code: Guid.NewGuid().ToString(),
+                action: "Update",
                 entityType: "ProductAttributes",
-                entityId: productattr.Id,
-                description: $"Cập nhật thuộc tính sản phẩm {productattr.Code} - {productattr.Name}",
+                entityId: attr.Id,
+                description: $"Cập nhật thuộc tính {attr.Name}",
                 oldValue: oldValue,
-                newValue: productattr,
+                newValue: attr,
                 userId: userId,
-                 ip: ip,
+                ip: ip,
                 userAgent: agent
-                );
+            );
 
-            return (await GetByIdAsync(productattr.Id))!;
+            return true;
         }
 
         public async Task<bool> DeActiveAsync(string id)
         {
-            var productattr = await _repo.GetByIdAsync(id);
-            if (productattr == null) return false;
-
-            var oldValue = new
-            {
-                productattr.IsDeleted,
-                productattr.UpdatedAt
-            };
-
-            productattr.IsDeleted = true;
-            productattr.UpdatedAt = DateTime.UtcNow;
-            await _repo.SaveChangesAsync();
+            var attr = await _repo.GetByIdAsync(id);
+            if (attr == null) return false;
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-            {
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-            }
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            var oldValue = new { attr.IsDeleted, attr.UpdatedAt };
+
+            attr.IsDeleted = true;
+            attr.UpdatedAt = DateTime.UtcNow;
+            attr.UpdatedBy = userId;
+
+            _repo.Update(attr);
+            await _repo.SaveChangesAsync();
 
             await _logService.LogAsync(
                 code: Guid.NewGuid().ToString(),
                 action: "DeActive",
                 entityType: "ProductAttributes",
-                entityId: productattr.Id,
-                description: $"Ngưng hoạt động thuộc tính sản phẩm {productattr.Code} - {productattr.Name}",
+                entityId: attr.Id,
+                description: $"Ngưng hoạt động thuộc tính {attr.Name}",
                 oldValue: oldValue,
-                newValue: new { productattr.IsDeleted, productattr.UpdatedAt },
+                newValue: new { attr.IsDeleted, attr.UpdatedAt },
                 userId: userId,
-                 ip: ip,
+                ip: ip,
                 userAgent: agent
             );
 
@@ -253,42 +244,53 @@ namespace Quanlicuahang.Services
 
         public async Task<bool> ActiveAsync(string id)
         {
-            var productattr = await _repo.GetByIdAsync(id);
-            if (productattr == null) return false;
-
-            var oldValue = new
-            {
-                productattr.IsDeleted,
-                productattr.UpdatedAt
-            };
-
-            productattr.IsDeleted = false;
-            productattr.UpdatedAt = DateTime.UtcNow;
-            await _repo.SaveChangesAsync();
-
+            var attr = await _repo.GetByIdAsync(id);
+            if (attr == null) return false;
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-            {
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-            }
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            var oldValue = new { attr.IsDeleted, attr.UpdatedAt };
+
+            attr.IsDeleted = false;
+            attr.UpdatedAt = DateTime.UtcNow;
+            attr.UpdatedBy = userId;
+
+            _repo.Update(attr);
+            await _repo.SaveChangesAsync();
 
             await _logService.LogAsync(
                 code: Guid.NewGuid().ToString(),
                 action: "Active",
                 entityType: "ProductAttributes",
-                entityId: productattr.Id,
-                description: $"Kích hoạt thuộc tính sản phẩm {productattr.Code} - {productattr.Name}",
+                entityId: attr.Id,
+                description: $"Kích hoạt thuộc tính {attr.Name}",
                 oldValue: oldValue,
-                newValue: new { productattr.IsDeleted, productattr.UpdatedAt },
+                newValue: new { attr.IsDeleted, attr.UpdatedAt },
                 userId: userId,
-                 ip: ip,
+                ip: ip,
                 userAgent: agent
             );
 
             return true;
+        }
+
+        public async Task<object> GetSelectBoxAsync()
+        {
+            var query = _repo.GetAll(false)
+                .OrderBy(c => c.Name)
+                .Select(c => new SelectBoxDto
+                {
+                    Id = c.Id,
+                    Code = c.Code,
+                    Name = c.Name
+                });
+
+            var data = await query.ToListAsync();
+            var total = data.Count;
+
+            return new { data, total };
         }
     }
 }

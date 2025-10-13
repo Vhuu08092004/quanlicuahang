@@ -14,5 +14,8 @@ public class ProductAttribute : BasePrimary
     [MaxLength(255)]
     public string? Description { get; set; }
 
+    [MaxLength(20)]
+    public string? DataType { get; set; }
+
     public virtual ICollection<ProductAttributeValue> AttributeValues { get; set; } = new List<ProductAttributeValue>();
 }
