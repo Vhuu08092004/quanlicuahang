@@ -22,6 +22,11 @@ namespace Quanlicuahang.Exception
             services.AddScoped<AuthService>();
 
 
+            // Report
+            services.AddScoped<IReportRepository, ReportRepository>();
+            services.AddScoped<IReportService, ReportService>();
+
+
             return services;
         }
     }

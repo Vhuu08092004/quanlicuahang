@@ -90,11 +90,11 @@ namespace Quanlicuahang.Repositories
                               && o.Status == "Completed"
                               && o.IsDeleted == false
                               && payment != null // Đảm bảo có payment
-                        group new { o, payment, ret } by o.OrderDate.Date into g
+                        group new { payment, ret } by o.OrderDate.Date into g
                         select new RevenueReportDto
                         {
                             Date = g.Key,
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount), // Net revenue
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0), // Net revenue
                             OrderCount = g.Count()
                         };
 
@@ -116,11 +116,11 @@ namespace Quanlicuahang.Repositories
                               && o.Status == "Completed"
                               && o.IsDeleted == false
                               && payment != null
-                        group new { o, payment, ret } by new { o.OrderDate.Year, o.OrderDate.Month, Day = o.OrderDate.Day } into g
+                        group new { payment, ret } by new { o.OrderDate.Year, o.OrderDate.Month, Day = o.OrderDate.Day } into g
                         select new RevenueReportDto
                         {
                             Date = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day),
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount),
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0),
                             OrderCount = g.Count()
                         };
 
@@ -142,11 +142,11 @@ namespace Quanlicuahang.Repositories
                               && o.Status == "Completed"
                               && o.IsDeleted == false
                               && payment != null
-                        group new { o, payment, ret } by new { o.OrderDate.Year, o.OrderDate.Month } into g
+                        group new { payment, ret } by new { o.OrderDate.Year, o.OrderDate.Month } into g
                         select new RevenueReportDto
                         {
                             Date = new DateTime(g.Key.Year, g.Key.Month, 1), // Ngày đầu tháng
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount),
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0),
                             OrderCount = g.Count()
                         };
 
@@ -166,11 +166,11 @@ namespace Quanlicuahang.Repositories
                               && o.Status == "Completed"
                               && o.IsDeleted == false
                               && payment != null
-                        group new { o, u, payment, ret } by u.FullName into g
+                        group new { payment, ret } by u.FullName into g
                         select new RevenueByEmployeeDto
                         {
                             EmployeeName = g.Key,
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount),
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0),
                             OrderCount = g.Count()
                         };
 
@@ -190,11 +190,11 @@ namespace Quanlicuahang.Repositories
                               && o.Status == "Completed"
                               && o.IsDeleted == false
                               && payment != null
-                        group new { o, c, payment, ret } by c.Name into g
+                        group new { payment, ret } by c.Name into g
                         select new RevenueByCustomerDto
                         {
                             CustomerName = g.Key,
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount),
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0),
                             OrderCount = g.Count()
                         };
 
@@ -217,12 +217,12 @@ namespace Quanlicuahang.Repositories
                         let groupName = c.Address.Contains("Hà Nội") ? "Hà Nội" :
                                         c.Address.Contains("TP.HCM") ? "TP.HCM" :
                                         c.Address.Contains("Đà Nẵng") ? "Đà Nẵng" : "Khác" // Logic group đơn giản, mở rộng nếu cần
-                        group new { o, c, payment, ret } by groupName into g
+                        group new { payment, ret, customerId = c.Id } by groupName into g
                         select new RevenueByCustomerGroupDto
                         {
                             GroupName = g.Key,
-                            TotalRevenue = g.Sum(x => x.payment.Amount - x.ret.RefundAmount),
-                            CustomerCount = g.Select(x => x.c.Id).Distinct().Count()
+                            TotalRevenue = g.Sum(x => x.payment.Amount) - g.Sum(x => x.ret != null ? x.ret.RefundAmount : 0),
+                            CustomerCount = g.Select(x => x.customerId).Distinct().Count()
                         };
 
             return await query.AsNoTracking().OrderByDescending(x => x.TotalRevenue).ToListAsync();
