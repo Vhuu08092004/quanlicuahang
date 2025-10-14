@@ -17,7 +17,6 @@ namespace Quanlicuahang.Models
 
         public string Description { get; set; } = string.Empty;
 
-        // Quan hệ
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }

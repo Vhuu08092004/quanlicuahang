@@ -16,7 +16,7 @@ namespace Quanlicuahang.Models
         public decimal Amount { get; set; }
 
         [Required, MaxLength(50)]
-        public string PaymentMethod { get; set; } = "cash"; 
+        public string PaymentMethod { get; set; } = "cash";
 
         public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
     }

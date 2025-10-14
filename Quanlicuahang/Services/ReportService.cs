@@ -1,7 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Quanlicuahang.DTOs.Report;
-using Quanlicuahang.Models;
-using Quanlicuahang.Repositories;
+﻿using Quanlicuahang.Repositories;
 
 namespace Quanlicuahang.Services
 {

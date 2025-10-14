@@ -18,5 +18,7 @@ namespace Quanlicuahang.Models
         public virtual Product Product { get; set; } = null!;
 
         public int Quantity { get; set; } = 0;
+
+
     }
 }
