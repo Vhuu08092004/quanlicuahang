@@ -13,9 +13,10 @@ namespace Quanlicuahang.DTOs.Product
         public string? CategoryName { get; set; }
         public string? SupplierId { get; set; }
         public string? SupplierName { get; set; }
-
         public List<ProductAttributeValueDto> Attributes { get; set; } = new();
     }
+
+
 
     public class ProductCreateUpdateDto
     {
@@ -26,10 +27,9 @@ namespace Quanlicuahang.DTOs.Product
         public string Unit { get; set; } = "pcs";
         public string? CategoryId { get; set; }
         public string? SupplierId { get; set; }
-
         public List<ProductAttributeValueCreateUpdateDto> Attributes { get; set; } = new();
-
     }
+
 
     public class ProductSearchDto : BaseSearchDto
     {

@@ -3,6 +3,7 @@ using Quanlicuahang.DTOs;
 using Quanlicuahang.DTOs.Product;
 using Quanlicuahang.DTOs.ProductAttribute;
 using Quanlicuahang.Helpers;
+using Quanlicuahang.Models;
 using Quanlicuahang.Repositories;
 
 namespace Quanlicuahang.Services
@@ -195,7 +196,45 @@ namespace Quanlicuahang.Services
             await _repo.AddAsync(product);
             await _repo.SaveChangesAsync();
 
-            // Log creation
+
+            // Create product attribute values if provided
+            if (dto.Attributes != null && dto.Attributes.Count > 0)
+            {
+                var attributeValues = new List<ProductAttributeValue>();
+
+                foreach (var attrDto in dto.Attributes)
+                {
+                    var attributeExists = await _attributeRepo.ExistsAsync(a => a.Id == attrDto.AttributeId && !a.IsDeleted);
+                    if (!attributeExists)
+                        throw new System.Exception($"Thuộc tính với ID '{attrDto.AttributeId}' không tồn tại!");
+
+                    var attributeValue = new ProductAttributeValue
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        ProductId = product.Id,
+                        AttributeId = attrDto.AttributeId,
+                        ValueString = attrDto.ValueString,
+                        ValueDecimal = attrDto.ValueDecimal,
+                        ValueInt = attrDto.ValueInt,
+                        ValueBool = attrDto.ValueBool,
+                        ValueDate = attrDto.ValueDate,
+                        DisplayOrder = attrDto.DisplayOrder,
+                        CreatedBy = userId,
+                        UpdatedBy = userId,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    attributeValues.Add(attributeValue);
+                }
+
+                foreach (var attrValue in attributeValues)
+                {
+                    await _attributeValueRepo.AddAsync(attrValue);
+                }
+                await _attributeValueRepo.SaveChangesAsync();
+            }
+
             await _logService.LogAsync(
                 code: Guid.NewGuid().ToString(),
                 action: "Create",
@@ -235,8 +274,10 @@ namespace Quanlicuahang.Services
                 product.Price,
                 product.Unit,
                 product.CategoryId,
-                product.SupplierId
+                product.SupplierId,
             };
+
+          
 
             product.Code = dto.Code;
             product.Name = dto.Name;
@@ -250,6 +291,69 @@ namespace Quanlicuahang.Services
 
             _repo.Update(product);
             await _repo.SaveChangesAsync();
+
+            // Update product attribute values
+            if (dto.Attributes != null)
+            {
+                var existingAttributeValues = await _attributeValueRepo.GetAll(false)
+                    .Where(av => av.ProductId == id)
+                    .ToListAsync();
+
+                foreach (var existing in existingAttributeValues)
+                {
+                    existing.IsDeleted = true;
+                    existing.UpdatedBy = userId;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    _attributeValueRepo.Update(existing);
+                }
+
+                foreach (var attrDto in dto.Attributes)
+                {
+                    var attributeExists = await _attributeRepo.ExistsAsync(a => a.Id == attrDto.AttributeId && !a.IsDeleted);
+                    if (!attributeExists)
+                        throw new System.Exception($"Thuộc tính với ID '{attrDto.AttributeId}' không tồn tại!");
+
+                    var existingAttrValue = existingAttributeValues
+                        .FirstOrDefault(av => av.AttributeId == attrDto.AttributeId);
+
+                    if (existingAttrValue != null)
+                    {
+                        existingAttrValue.ValueString = attrDto.ValueString;
+                        existingAttrValue.ValueDecimal = attrDto.ValueDecimal;
+                        existingAttrValue.ValueInt = attrDto.ValueInt;
+                        existingAttrValue.ValueBool = attrDto.ValueBool;
+                        existingAttrValue.ValueDate = attrDto.ValueDate;
+                        existingAttrValue.DisplayOrder = attrDto.DisplayOrder;
+                        existingAttrValue.IsDeleted = false;
+                        existingAttrValue.UpdatedBy = userId;
+                        existingAttrValue.UpdatedAt = DateTime.UtcNow;
+                        _attributeValueRepo.Update(existingAttrValue);
+                    }
+                    else
+                    {
+                        var attributeValue = new ProductAttributeValue
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            ProductId = id,
+                            AttributeId = attrDto.AttributeId,
+                            ValueString = attrDto.ValueString,
+                            ValueDecimal = attrDto.ValueDecimal,
+                            ValueInt = attrDto.ValueInt,
+                            ValueBool = attrDto.ValueBool,
+                            ValueDate = attrDto.ValueDate,
+                            DisplayOrder = attrDto.DisplayOrder,
+                            CreatedBy = userId,
+                            UpdatedBy = userId,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+
+                        await _attributeValueRepo.AddAsync(attributeValue);
+                    }
+                }
+
+                await _attributeValueRepo.SaveChangesAsync();
+            }
 
             await _logService.LogAsync(
                 code: Guid.NewGuid().ToString(),
