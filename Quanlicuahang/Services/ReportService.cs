@@ -1,17 +1,18 @@
 ﻿using Quanlicuahang.Repositories;
+using Quanlicuahang.DTOs.Report;
 
 namespace Quanlicuahang.Services
 {
     public interface IReportService
     {
-        Task<List<RevenueReportDto>> GetRevenueByDayAsync(DateTime date);
-        Task<List<RevenueReportDto>> GetRevenueByMonthAsync(int year, int month);
-        Task<List<RevenueReportDto>> GetRevenueByYearAsync(int year);
-        Task<List<RevenueByEmployeeDto>> GetRevenueByEmployeeAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<RevenueByCustomerDto>> GetRevenueByCustomerAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<RevenueByCustomerGroupDto>> GetRevenueByCustomerGroupAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<TopSellingProductDto>> GetTopSellingProductsAsync(int topN = 10, DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<InventoryReportDto>> GetInventoryReportAsync();
+        Task<object> GetRevenueByDayAsync(DateTime date, int skip, int take);
+        Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take);
+        Task<object> GetRevenueByYearAsync(int year, int skip, int take);
+        Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetInventoryReportAsync(int skip, int take);
     }
 
     public class ReportService : IReportService
@@ -24,51 +25,51 @@ namespace Quanlicuahang.Services
         }
 
         /** Báo cáo doanh thu theo ngày */
-        public async Task<List<RevenueReportDto>> GetRevenueByDayAsync(DateTime date)
+        public async Task<object> GetRevenueByDayAsync(DateTime date, int skip, int take)
         {
-            return await _repository.GetRevenueByDayAsync(date);
+            return await _repository.GetRevenueByDayAsync(date, skip, take);
         }
 
         /** Báo cáo doanh thu theo tháng */
-        public async Task<List<RevenueReportDto>> GetRevenueByMonthAsync(int year, int month)
+        public async Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take)
         {
-            return await _repository.GetRevenueByMonthAsync(year, month);
+            return await _repository.GetRevenueByMonthAsync(year, month, skip, take);
         }
 
         /** Báo cáo doanh thu theo năm */
-        public async Task<List<RevenueReportDto>> GetRevenueByYearAsync(int year)
+        public async Task<object> GetRevenueByYearAsync(int year, int skip, int take)
         {
-            return await _repository.GetRevenueByYearAsync(year);
+            return await _repository.GetRevenueByYearAsync(year, skip, take);
         }
 
         /** Báo cáo doanh thu theo nhân viên */
-        public async Task<List<RevenueByEmployeeDto>> GetRevenueByEmployeeAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            return await _repository.GetRevenueByEmployeeAsync(fromDate, toDate);
+            return await _repository.GetRevenueByEmployeeAsync(fromDate, toDate, skip, take);
         }
 
         /** Báo cáo doanh thu theo khách hàng */
-        public async Task<List<RevenueByCustomerDto>> GetRevenueByCustomerAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            return await _repository.GetRevenueByCustomerAsync(fromDate, toDate);
+            return await _repository.GetRevenueByCustomerAsync(fromDate, toDate, skip, take);
         }
 
         /** Báo cáo doanh thu theo nhóm khách hàng */
-        public async Task<List<RevenueByCustomerGroupDto>> GetRevenueByCustomerGroupAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            return await _repository.GetRevenueByCustomerGroupAsync(fromDate, toDate);
+            return await _repository.GetRevenueByCustomerGroupAsync(fromDate, toDate, skip, take);
         }
 
         /** Báo cáo sản phẩm bán chạy */
-        public async Task<List<TopSellingProductDto>> GetTopSellingProductsAsync(int topN = 10, DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            return await _repository.GetTopSellingProductsAsync(topN, fromDate, toDate);
+            return await _repository.GetTopSellingProductsAsync(topN, fromDate, toDate, skip, take);
         }
 
         /** Báo cáo sản phẩm tồn kho */
-        public async Task<List<InventoryReportDto>> GetInventoryReportAsync()
+        public async Task<object> GetInventoryReportAsync(int skip, int take)
         {
-            return await _repository.GetInventoryReportAsync();
+            return await _repository.GetInventoryReportAsync(skip, take);
         }
     }
 }

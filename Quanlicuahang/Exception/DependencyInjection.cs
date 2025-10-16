@@ -47,6 +47,11 @@ namespace Quanlicuahang.Exception
             /* HELPERS */
             services.AddScoped<ITokenHelper, TokenHelper>();
 
+            // Report
+            services.AddScoped<IReportRepository, ReportRepository>();
+            services.AddScoped<IReportService, ReportService>();
+
+
             return services;
         }
     }
