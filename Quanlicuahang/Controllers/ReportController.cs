@@ -71,24 +71,12 @@ namespace Quanlicuahang.Controllers
         /// <summary>
         /// Báo cáo doanh thu theo khách hàng
         /// </summary>
-        /// <param name="filter">Filter với FromDate, ToDate, Skip, Take</param>
+        /// <param name="filter">Filter với FromDate, ToDate, Region ("hà nội", "hồ chí minh", "đà nẵng"), Skip, Take</param>
         /// <returns>Paginated list of RevenueByCustomerDto</returns>
         [HttpPost("revenue/customer")]
         public async Task<ActionResult<object>> GetRevenueByCustomerAsync([FromBody] RevenueFilterDto filter)
         {
-            var result = await _service.GetRevenueByCustomerAsync(filter.FromDate, filter.ToDate, filter.Skip, filter.Take);
-            return Ok(result);
-        }
-
-        /// <summary>
-        /// Báo cáo doanh thu theo nhóm khách hàng
-        /// </summary>
-        /// <param name="filter">Filter với FromDate, ToDate, Skip, Take</param>
-        /// <returns>Paginated list of RevenueByCustomerGroupDto</returns>
-        [HttpPost("revenue/customergroup")]
-        public async Task<ActionResult<object>> GetRevenueByCustomerGroupAsync([FromBody] RevenueFilterDto filter)
-        {
-            var result = await _service.GetRevenueByCustomerGroupAsync(filter.FromDate, filter.ToDate, filter.Skip, filter.Take);
+            var result = await _service.GetRevenueByCustomerAsync(filter.FromDate, filter.ToDate, filter.Region, filter.Skip, filter.Take);
             return Ok(result);
         }
 

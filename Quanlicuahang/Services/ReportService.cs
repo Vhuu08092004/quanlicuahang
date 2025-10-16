@@ -9,7 +9,7 @@ namespace Quanlicuahang.Services
         Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take);
         Task<object> GetRevenueByYearAsync(int year, int skip, int take);
         Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
-        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, string? region, int skip, int take);
         Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
         Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take);
         Task<object> GetInventoryReportAsync(int skip, int take);
@@ -49,15 +49,17 @@ namespace Quanlicuahang.Services
         }
 
         /** Báo cáo doanh thu theo khách hàng */
-        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
+        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, string? region, int skip, int take)
         {
-            return await _repository.GetRevenueByCustomerAsync(fromDate, toDate, skip, take);
+            return await _repository.GetRevenueByCustomerAsync(fromDate, toDate, region, skip, take);
         }
 
         /** Báo cáo doanh thu theo nhóm khách hàng */
         public async Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            return await _repository.GetRevenueByCustomerGroupAsync(fromDate, toDate, skip, take);
+            // Đây là method tổng hợp, gọi GetRevenueByCustomerAsync với các region khác nhau
+            // Hoặc có thể implement riêng nếu cần
+            throw new NotImplementedException("Method này đã được thay thế bởi GetRevenueByCustomerAsync với tham số region");
         }
 
         /** Báo cáo sản phẩm bán chạy */
