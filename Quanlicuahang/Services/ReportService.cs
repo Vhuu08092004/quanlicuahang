@@ -1,4 +1,5 @@
 ﻿using Quanlicuahang.Repositories;
+using Quanlicuahang.DTOs.Report;
 
 namespace Quanlicuahang.Services
 {

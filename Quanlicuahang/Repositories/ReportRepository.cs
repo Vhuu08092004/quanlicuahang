@@ -1,51 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.Data;
+using Quanlicuahang.DTOs.Report;
 
 namespace Quanlicuahang.Repositories
 {
-    // DTOs cho các báo cáo (định nghĩa đơn giản, bạn có thể mở rộng)
-    public class RevenueReportDto
-    {
-        public DateTime Date { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public int OrderCount { get; set; }
-    }
-
-    public class RevenueByEmployeeDto
-    {
-        public string EmployeeName { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public int OrderCount { get; set; }
-    }
-
-    public class RevenueByCustomerDto
-    {
-        public string CustomerName { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public int OrderCount { get; set; }
-    }
-
-    public class RevenueByCustomerGroupDto
-    {
-        public string GroupName { get; set; } // Ví dụ: "Hà Nội", "TP.HCM", dựa trên Address
-        public decimal TotalRevenue { get; set; }
-        public int CustomerCount { get; set; }
-    }
-
-    public class TopSellingProductDto
-    {
-        public string ProductName { get; set; }
-        public int TotalQuantity { get; set; }
-        public decimal TotalRevenue { get; set; }
-    }
-
-    public class InventoryReportDto
-    {
-        public string ProductName { get; set; }
-        public int Quantity { get; set; }
-        public string CategoryName { get; set; }
-    }
-
     // Interface cho ReportRepository
     public interface IReportRepository
     {
@@ -62,7 +20,7 @@ namespace Quanlicuahang.Repositories
     // Implementation của ReportRepository, lấy thẳng từ DbContext
     public class ReportRepository : IReportRepository
     {
-        private readonly ApplicationDbContext _context; // Giả sử tên DbContext
+        private readonly ApplicationDbContext _context; 
 
         public ReportRepository(ApplicationDbContext context)
         {
@@ -216,55 +174,121 @@ namespace Quanlicuahang.Repositories
             return result;
         }
 
-        // Báo cáo doanh thu theo nhân viên
         public async Task<List<RevenueByEmployeeDto>> GetRevenueByEmployeeAsync(DateTime? fromDate = null, DateTime? toDate = null)
         {
-            // Get payments grouped by employee
-            var paymentsQuery = from o in _context.Orders
-                                join u in _context.Users on o.UserId equals u.Id
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
-                                      && o.Status == "Completed"
-                                      && o.IsDeleted == false
-                                group new { o, p } by u.FullName into g
-                                select new
-                                {
-                                    EmployeeName = g.Key,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    OrderCount = g.Select(x => x.o.Id).Distinct().Count()
-                                };
+            Console.WriteLine("⏰ Thời gian backend nhận request: " + fromDate);
+            Console.WriteLine("⏰ Thời gian trong payload: " + toDate);
+            // Lấy tất cả nhân viên và tính tổng thanh toán (kể cả không có đơn)
+            var paymentsQuery =
+                from e in _context.Employees
 
-            // Get returns grouped by employee
-            var returnsQuery = from o in _context.Orders
-                               join u in _context.Users on o.UserId equals u.Id
-                               join r in _context.Returns on o.Id equals r.OrderId
-                               where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
-                                     && o.Status == "Completed"
-                                     && o.IsDeleted == false
-                               group r by u.FullName into g
-                               select new
-                               {
-                                   EmployeeName = g.Key,
-                                   TotalRefund = g.Sum(x => x.RefundAmount)
-                               };
+                join u in _context.Users on e.Id equals u.EmployeeId into userGroup
+                from u in userGroup.DefaultIfEmpty()
+
+                join o in _context.Orders on u.Id equals o.UserId into orderGroup
+                from o in orderGroup.DefaultIfEmpty()
+
+                join p in _context.Payments on o.Id equals p.OrderId into paymentGroup
+                from p in paymentGroup.DefaultIfEmpty()
+
+                group new { o, p } by new { e.Id, e.FullName } into g
+                select new
+                {
+                    EmployeeId = g.Key.Id,
+                    EmployeeName = g.Key.FullName,
+
+                    TotalPayment = g
+                        .Where(x =>
+                            x.o != null &&
+                            (fromDate == null || x.o.OrderDate >= fromDate) &&
+                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            x.o.Status == "Completed" &&
+                            !x.o.IsDeleted &&
+                            x.p != null
+                        )
+                        .Sum(x => (decimal?)x.p.Amount) ?? 0,
+
+                    TotalOrderAmount = g
+                        .Where(x =>
+                            x.o != null &&
+                            (fromDate == null || x.o.OrderDate >= fromDate) &&
+                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            x.o.Status == "Completed" &&
+                            !x.o.IsDeleted
+                        )
+                        .Sum(x => (decimal?)((x.o.TotalAmount) - (x.o.DiscountAmount))) ?? 0,
+
+                    OrderCount = g
+                        .Where(x =>
+                            x.o != null &&
+                            (fromDate == null || x.o.OrderDate >= fromDate) &&
+                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            x.o.Status == "Completed" &&
+                            !x.o.IsDeleted
+                        )
+                        .Select(x => x.o.Id)
+                        .Distinct()
+                        .Count()
+                };
+
+            // Lấy tổng tiền hoàn (returns)
+            var returnsQuery =
+                from e in _context.Employees
+
+                join u in _context.Users on e.Id equals u.EmployeeId into userGroup
+                from u in userGroup.DefaultIfEmpty()
+
+                join o in _context.Orders on u.Id equals o.UserId into orderGroup
+                from o in orderGroup.DefaultIfEmpty()
+
+                join r in _context.Returns on o.Id equals r.OrderId into returnGroup
+                from r in returnGroup.DefaultIfEmpty()
+
+                group new { o, r } by new { e.Id, e.FullName } into g
+                select new
+                {
+                    EmployeeId = g.Key.Id,
+                    EmployeeName = g.Key.FullName,
+                    TotalRefund = g
+                        .Where(x =>
+                            x.o != null &&
+                            (fromDate == null || x.o.OrderDate >= fromDate) &&
+                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            x.o.Status == "Completed" &&
+                            !x.o.IsDeleted &&
+                            x.r != null
+                        )
+                        .Sum(x => (decimal?)x.r.RefundAmount) ?? 0
+                };
 
             var payments = await paymentsQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
-            // Combine the results
-            var result = payments.Select(p => new RevenueByEmployeeDto
-            {
-                EmployeeName = p.EmployeeName,
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.EmployeeName == p.EmployeeName)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount
-            }).OrderByDescending(x => x.TotalRevenue).ToList();
+            // Ghép kết quả, đảm bảo mọi nhân viên đều có mặt
+            var result = (
+                from p in payments
+                join r in returns on p.EmployeeId equals r.EmployeeId into returnGroup
+                from r in returnGroup.DefaultIfEmpty()
+                select new RevenueByEmployeeDto
+                {
+                    EmployeeName = p.EmployeeName,
+                    TotalRevenue = p.TotalPayment - (r?.TotalRefund ?? 0),
+                    Commission = p.TotalOrderAmount - p.TotalPayment - (r?.TotalRefund ?? 0),
+                    OrderCount = p.OrderCount
+                }
+            )
+            .OrderByDescending(x => x.TotalRevenue)
+            .ToList();
 
             return result;
         }
 
+
+
         // Báo cáo doanh thu theo khách hàng
         public async Task<List<RevenueByCustomerDto>> GetRevenueByCustomerAsync(DateTime? fromDate = null, DateTime? toDate = null)
         {
+            
             // Get payments grouped by customer
             var paymentsQuery = from o in _context.Orders
                                 join c in _context.Customers on o.CustomerId equals c.Id
