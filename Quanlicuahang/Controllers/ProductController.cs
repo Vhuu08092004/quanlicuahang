@@ -31,14 +31,14 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> Create([FromBody] ProductCreateUpdateDto dto)
+        public async Task<IActionResult> Create([FromForm] ProductCreateUpdateDto dto)
         {
             var result = await _service.CreateAsync(dto);
             return Ok(result);
         }
 
         [HttpPost("update/{id}")]
-        public async Task<IActionResult> Update(string id, [FromBody] ProductCreateUpdateDto dto)
+        public async Task<IActionResult> Update(string id, [FromForm] ProductCreateUpdateDto dto)
         {
             var result = await _service.UpdateAsync(id, dto);
             return Ok(result);

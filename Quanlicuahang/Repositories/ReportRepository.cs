@@ -7,14 +7,14 @@ namespace Quanlicuahang.Repositories
     // Interface cho ReportRepository
     public interface IReportRepository
     {
-        Task<List<RevenueReportDto>> GetRevenueByDayAsync(DateTime date);
-        Task<List<RevenueReportDto>> GetRevenueByMonthAsync(int year, int month);
-        Task<List<RevenueReportDto>> GetRevenueByYearAsync(int year);
-        Task<List<RevenueByEmployeeDto>> GetRevenueByEmployeeAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<RevenueByCustomerDto>> GetRevenueByCustomerAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<RevenueByCustomerGroupDto>> GetRevenueByCustomerGroupAsync(DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<TopSellingProductDto>> GetTopSellingProductsAsync(int topN = 10, DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<InventoryReportDto>> GetInventoryReportAsync();
+        Task<object> GetRevenueByDayAsync(DateTime date, int skip, int take);
+        Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take);
+        Task<object> GetRevenueByYearAsync(int year, int skip, int take);
+        Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetInventoryReportAsync(int skip, int take);
     }
 
     // Implementation của ReportRepository, lấy thẳng từ DbContext
@@ -28,8 +28,11 @@ namespace Quanlicuahang.Repositories
         }
 
         // Báo cáo doanh thu theo ngày (net revenue: total - discount - refund)
-        public async Task<List<RevenueReportDto>> GetRevenueByDayAsync(DateTime date)
+        public async Task<object> GetRevenueByDayAsync(DateTime date, int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             var startOfDay = date.Date;
             var endOfDay = startOfDay.AddDays(1).AddTicks(-1);
 
@@ -64,19 +67,25 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var result = payments.Select(p => new RevenueReportDto
+            var allResults = payments.Select(p => new RevenueReportDto
             {
                 Date = p.Date,
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Date == p.Date)?.TotalRefund ?? 0),
                 OrderCount = p.OrderCount
             }).ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
         // Báo cáo doanh thu theo tháng
-        public async Task<List<RevenueReportDto>> GetRevenueByMonthAsync(int year, int month)
+        public async Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             var startOfMonth = new DateTime(year, month, 1);
             var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1).Date.AddHours(23).AddMinutes(59).AddSeconds(59);
 
@@ -115,19 +124,25 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var result = payments.Select(p => new RevenueReportDto
+            var allResults = payments.Select(p => new RevenueReportDto
             {
                 Date = new DateTime(p.Year, p.Month, p.Day),
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month && r.Day == p.Day)?.TotalRefund ?? 0),
                 OrderCount = p.OrderCount
             }).OrderBy(x => x.Date).ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
         // Báo cáo doanh thu theo năm (theo tháng trong năm)
-        public async Task<List<RevenueReportDto>> GetRevenueByYearAsync(int year)
+        public async Task<object> GetRevenueByYearAsync(int year, int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             var startOfYear = new DateTime(year, 1, 1);
             var endOfYear = new DateTime(year, 12, 31, 23, 59, 59);
 
@@ -164,20 +179,25 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var result = payments.Select(p => new RevenueReportDto
+            var allResults = payments.Select(p => new RevenueReportDto
             {
                 Date = new DateTime(p.Year, p.Month, 1), // Ngày đầu tháng
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month)?.TotalRefund ?? 0),
                 OrderCount = p.OrderCount
             }).OrderBy(x => x.Date).ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
-        public async Task<List<RevenueByEmployeeDto>> GetRevenueByEmployeeAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            Console.WriteLine("⏰ Thời gian backend nhận request: " + fromDate);
-            Console.WriteLine("⏰ Thời gian trong payload: " + toDate);
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
+            var realToDate = toDate.HasValue ? toDate.Value.AddDays(1) : (DateTime?)null;
             // Lấy tất cả nhân viên và tính tổng thanh toán (kể cả không có đơn)
             var paymentsQuery =
                 from e in _context.Employees
@@ -201,7 +221,7 @@ namespace Quanlicuahang.Repositories
                         .Where(x =>
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
-                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            (toDate == null || x.o.OrderDate < realToDate) &&
                             x.o.Status == "Completed" &&
                             !x.o.IsDeleted &&
                             x.p != null
@@ -212,7 +232,7 @@ namespace Quanlicuahang.Repositories
                         .Where(x =>
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
-                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            (toDate == null || x.o.OrderDate < realToDate) &&
                             x.o.Status == "Completed" &&
                             !x.o.IsDeleted
                         )
@@ -222,7 +242,7 @@ namespace Quanlicuahang.Repositories
                         .Where(x =>
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
-                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            (toDate == null || x.o.OrderDate < realToDate) &&
                             x.o.Status == "Completed" &&
                             !x.o.IsDeleted
                         )
@@ -253,7 +273,7 @@ namespace Quanlicuahang.Repositories
                         .Where(x =>
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
-                            (toDate == null || x.o.OrderDate <= toDate) &&
+                            (toDate == null || x.o.OrderDate < realToDate) &&
                             x.o.Status == "Completed" &&
                             !x.o.IsDeleted &&
                             x.r != null
@@ -265,30 +285,35 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Ghép kết quả, đảm bảo mọi nhân viên đều có mặt
-            var result = (
+            var allResults = (
                 from p in payments
                 join r in returns on p.EmployeeId equals r.EmployeeId into returnGroup
                 from r in returnGroup.DefaultIfEmpty()
                 select new RevenueByEmployeeDto
                 {
                     EmployeeName = p.EmployeeName,
-                    TotalRevenue = p.TotalPayment - (r?.TotalRefund ?? 0),
-                    Commission = p.TotalOrderAmount - p.TotalPayment - (r?.TotalRefund ?? 0),
+                    TotalRevenue = p.TotalOrderAmount - (r?.TotalRefund ?? 0),
+                    TotalPayment = p.TotalPayment - (r?.TotalRefund ?? 0),
                     OrderCount = p.OrderCount
                 }
             )
             .OrderByDescending(x => x.TotalRevenue)
             .ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
 
 
         // Báo cáo doanh thu theo khách hàng
-        public async Task<List<RevenueByCustomerDto>> GetRevenueByCustomerAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
-            
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             // Get payments grouped by customer
             var paymentsQuery = from o in _context.Orders
                                 join c in _context.Customers on o.CustomerId equals c.Id
@@ -322,19 +347,25 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var result = payments.Select(p => new RevenueByCustomerDto
+            var allResults = payments.Select(p => new RevenueByCustomerDto
             {
                 CustomerName = p.CustomerName,
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.CustomerName == p.CustomerName)?.TotalRefund ?? 0),
                 OrderCount = p.OrderCount
             }).OrderByDescending(x => x.TotalRevenue).ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
         // Báo cáo doanh thu theo nhóm khách hàng (group dựa trên Address, ví dụ tỉnh/thành)
-        public async Task<List<RevenueByCustomerGroupDto>> GetRevenueByCustomerGroupAsync(DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             // Get payments grouped by customer group
             var paymentsQuery = from o in _context.Orders
                                 join c in _context.Customers on o.CustomerId equals c.Id
@@ -374,19 +405,25 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var result = payments.Select(p => new RevenueByCustomerGroupDto
+            var allResults = payments.Select(p => new RevenueByCustomerGroupDto
             {
                 GroupName = p.GroupName,
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.GroupName == p.GroupName)?.TotalRefund ?? 0),
                 CustomerCount = p.CustomerCount
             }).OrderByDescending(x => x.TotalRevenue).ToList();
 
-            return result;
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
         // Báo cáo sản phẩm bán chạy (top theo quantity hoặc revenue)
-        public async Task<List<TopSellingProductDto>> GetTopSellingProductsAsync(int topN = 10, DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             var query = from oi in _context.OrderItems
                         join o in _context.Orders on oi.OrderId equals o.Id
                         join prod in _context.Products on oi.ProductId equals prod.Id
@@ -401,15 +438,23 @@ namespace Quanlicuahang.Repositories
                             TotalRevenue = g.Sum(x => x.Subtotal)
                         };
 
-            return await query.AsNoTracking()
+            var allResults = await query.AsNoTracking()
                              .OrderByDescending(x => x.TotalQuantity)
                              .Take(topN)
                              .ToListAsync();
+
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
+
+            return new { data, total };
         }
 
         // Báo cáo sản phẩm tồn kho
-        public async Task<List<InventoryReportDto>> GetInventoryReportAsync()
+        public async Task<object> GetInventoryReportAsync(int skip, int take)
         {
+            skip = skip < 0 ? 0 : skip;
+            take = take <= 0 ? 10 : take;
+
             var query = from inv in _context.Inventories
                         join prod in _context.Products on inv.ProductId equals prod.Id
                         join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
@@ -422,7 +467,16 @@ namespace Quanlicuahang.Repositories
                             CategoryName = category != null ? category.Name : "Không phân loại"
                         };
 
-            return await query.AsNoTracking().OrderBy(x => x.CategoryName).ThenBy(x => x.ProductName).ToListAsync();
+            var total = await query.CountAsync();
+
+            var data = await query.AsNoTracking()
+                .OrderBy(x => x.CategoryName)
+                .ThenBy(x => x.ProductName)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync();
+
+            return new { data, total };
         }
     }
 }
