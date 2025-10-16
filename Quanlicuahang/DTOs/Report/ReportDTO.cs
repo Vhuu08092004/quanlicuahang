@@ -17,6 +17,7 @@
         public DateTime Date { get; set; }
         public decimal TotalRevenue { get; set; }
         public int OrderCount { get; set; }
+        public float AvgOrderValue { get; set; }
     }
 
     public class RevenueByEmployeeDto
@@ -32,6 +33,7 @@
         public string CustomerName { get; set; }
         public decimal TotalRevenue { get; set; }
         public int OrderCount { get; set; }
+        public float AverageOrder { get; set; }
     }
 
     public class RevenueByCustomerGroupDto
@@ -44,48 +46,20 @@
     public class TopSellingProductDto
     {
         public string ProductName { get; set; }
+        public string? CategoryName { get; set; }
         public int TotalQuantity { get; set; }
         public decimal TotalRevenue { get; set; }
+        public int StockQuantity { get; set; } // Số lượng tồn kho
     }
 
     public class InventoryReportDto
     {
         public string ProductName { get; set; }
-        public int Quantity { get; set; }
         public string CategoryName { get; set; }
-    }
-
-    // Input DTOs with pagination
-    public class DayRevenueInputDto : ReportPaginationDto
-    {
-        public DateTime Date { get; set; }
-    }
-
-    public class MonthRevenueInputDto : ReportPaginationDto
-    {
-        public int Year { get; set; }
-        public int Month { get; set; }
-    }
-
-    public class YearRevenueInputDto : ReportPaginationDto
-    {
-        public int Year { get; set; }
-    }
-
-    public class RevenueFilterDto : ReportPaginationDto
-    {
-        public DateTime? FromDate { get; set; }
-        public DateTime? ToDate { get; set; }
-    }
-
-    public class TopProductsFilterDto : ReportPaginationDto
-    {
-        public int TopN { get; set; } = 10;
-        public DateTime? FromDate { get; set; }
-        public DateTime? ToDate { get; set; }
-    }
-
-    public class InventoryFilterDto : ReportPaginationDto
-    {
+        public int Quantity { get; set; } // Số lượng tồn kho
+        public int SoldQuantity { get; set; } // Số lượng đã bán
+        public decimal UnitPrice { get; set; } // Đơn giá
+        public decimal InventoryValue { get; set; } // Giá trị tồn kho (Quantity * UnitPrice)
+        public string Status { get; set; } // "InStock", "LowStock", "OutOfStock"
     }
 }

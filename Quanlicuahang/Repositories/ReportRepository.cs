@@ -11,8 +11,7 @@ namespace Quanlicuahang.Repositories
         Task<object> GetRevenueByMonthAsync(int year, int month, int skip, int take);
         Task<object> GetRevenueByYearAsync(int year, int skip, int take);
         Task<object> GetRevenueByEmployeeAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
-        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
-        Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, string? region, int skip, int take);
         Task<object> GetTopSellingProductsAsync(int topN, DateTime? fromDate, DateTime? toDate, int skip, int take);
         Task<object> GetInventoryReportAsync(int skip, int take);
     }
@@ -71,7 +70,9 @@ namespace Quanlicuahang.Repositories
             {
                 Date = p.Date,
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Date == p.Date)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount
+                OrderCount = p.OrderCount,
+                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 :
+                    (p.TotalPayment - (returns.FirstOrDefault(r => r.Date == p.Date)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
             }).ToList();
 
             var total = allResults.Count;
@@ -128,7 +129,9 @@ namespace Quanlicuahang.Repositories
             {
                 Date = new DateTime(p.Year, p.Month, p.Day),
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month && r.Day == p.Day)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount
+                OrderCount = p.OrderCount,
+                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 :
+                        (p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month && r.Day == p.Day)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
             }).OrderBy(x => x.Date).ToList();
 
             var total = allResults.Count;
@@ -183,7 +186,10 @@ namespace Quanlicuahang.Repositories
             {
                 Date = new DateTime(p.Year, p.Month, 1), // Ngày đầu tháng
                 TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount
+                OrderCount = p.OrderCount,
+                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 : (p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
+
+
             }).OrderBy(x => x.Date).ToList();
 
             var total = allResults.Count;
@@ -309,22 +315,34 @@ namespace Quanlicuahang.Repositories
 
 
         // Báo cáo doanh thu theo khách hàng
-        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
+        public async Task<object> GetRevenueByCustomerAsync(DateTime? fromDate, DateTime? toDate, string? region, int skip, int take)
         {
             skip = skip < 0 ? 0 : skip;
             take = take <= 0 ? 10 : take;
+            var realToDate = toDate.HasValue ? toDate.Value.AddDays(1) : (DateTime?)null;
+
+            // Chuẩn hóa region string để so sánh không phân biệt hoa thường
+            var normalizedRegion = region?.Trim().ToLower();
 
             // Get payments grouped by customer
             var paymentsQuery = from o in _context.Orders
                                 join c in _context.Customers on o.CustomerId equals c.Id
                                 join p in _context.Payments on o.Id equals p.OrderId
-                                where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
+                                where (fromDate == null || o.OrderDate >= fromDate) 
+                                      && (toDate == null || o.OrderDate < realToDate)
                                       && o.Status == "Completed"
                                       && o.IsDeleted == false
-                                group new { o, p } by c.Name into g
+                                      // Lọc theo khu vực nếu được chỉ định
+                                      && (string.IsNullOrEmpty(normalizedRegion) 
+                                          || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
+                                          || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
+                                          || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
+                                group new { o, p, c } by new { c.Id, c.Name, c.Address } into g
                                 select new
                                 {
-                                    CustomerName = g.Key,
+                                    CustomerId = g.Key.Id,
+                                    CustomerName = g.Key.Name,
+                                    CustomerAddress = g.Key.Address,
                                     TotalPayment = g.Sum(x => x.p.Amount),
                                     OrderCount = g.Select(x => x.o.Id).Distinct().Count()
                                 };
@@ -333,83 +351,38 @@ namespace Quanlicuahang.Repositories
             var returnsQuery = from o in _context.Orders
                                join c in _context.Customers on o.CustomerId equals c.Id
                                join r in _context.Returns on o.Id equals r.OrderId
-                               where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
+                               where (fromDate == null || o.OrderDate >= fromDate) 
+                                     && (toDate == null || o.OrderDate < realToDate)
                                      && o.Status == "Completed"
                                      && o.IsDeleted == false
-                               group r by c.Name into g
+                                     // Lọc theo khu vực nếu được chỉ định
+                                     && (string.IsNullOrEmpty(normalizedRegion) 
+                                         || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
+                                         || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
+                                         || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
+                               group new { r, c } by new { c.Id, c.Name } into g
                                select new
                                {
-                                   CustomerName = g.Key,
-                                   TotalRefund = g.Sum(x => x.RefundAmount)
+                                   CustomerId = g.Key.Id,
+                                   CustomerName = g.Key.Name,
+                                   TotalRefund = g.Sum(x => x.r.RefundAmount)
                                };
 
             var payments = await paymentsQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p => new RevenueByCustomerDto
-            {
-                CustomerName = p.CustomerName,
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.CustomerName == p.CustomerName)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount
-            }).OrderByDescending(x => x.TotalRevenue).ToList();
-
-            var total = allResults.Count;
-            var data = allResults.Skip(skip).Take(take).ToList();
-
-            return new { data, total };
-        }
-
-        // Báo cáo doanh thu theo nhóm khách hàng (group dựa trên Address, ví dụ tỉnh/thành)
-        public async Task<object> GetRevenueByCustomerGroupAsync(DateTime? fromDate, DateTime? toDate, int skip, int take)
-        {
-            skip = skip < 0 ? 0 : skip;
-            take = take <= 0 ? 10 : take;
-
-            // Get payments grouped by customer group
-            var paymentsQuery = from o in _context.Orders
-                                join c in _context.Customers on o.CustomerId equals c.Id
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
-                                      && o.Status == "Completed"
-                                      && o.IsDeleted == false
-                                let groupName = c.Address.Contains("Hà Nội") ? "Hà Nội" :
-                                                c.Address.Contains("TP.HCM") ? "TP.HCM" :
-                                                c.Address.Contains("Đà Nẵng") ? "Đà Nẵng" : "Khác"
-                                group new { p, customerId = c.Id } by groupName into g
-                                select new
-                                {
-                                    GroupName = g.Key,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    CustomerCount = g.Select(x => x.customerId).Distinct().Count()
-                                };
-
-            // Get returns grouped by customer group
-            var returnsQuery = from o in _context.Orders
-                               join c in _context.Customers on o.CustomerId equals c.Id
-                               join r in _context.Returns on o.Id equals r.OrderId
-                               where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
-                                     && o.Status == "Completed"
-                                     && o.IsDeleted == false
-                               let groupName = c.Address.Contains("Hà Nội") ? "Hà Nội" :
-                                               c.Address.Contains("TP.HCM") ? "TP.HCM" :
-                                               c.Address.Contains("Đà Nẵng") ? "Đà Nẵng" : "Khác"
-                               group r by groupName into g
-                               select new
-                               {
-                                   GroupName = g.Key,
-                                   TotalRefund = g.Sum(x => x.RefundAmount)
-                               };
-
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
-            var returns = await returnsQuery.AsNoTracking().ToListAsync();
-
-            // Combine the results
-            var allResults = payments.Select(p => new RevenueByCustomerGroupDto
-            {
-                GroupName = p.GroupName,
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.GroupName == p.GroupName)?.TotalRefund ?? 0),
-                CustomerCount = p.CustomerCount
+            var allResults = payments.Select(p => {
+                var refund = returns.FirstOrDefault(r => r.CustomerId == p.CustomerId)?.TotalRefund ?? 0;
+                var netRevenue = p.TotalPayment - refund;
+                
+                return new RevenueByCustomerDto
+                {
+                    CustomerName = p.CustomerName,
+                    TotalRevenue = netRevenue,
+                    OrderCount = p.OrderCount,
+                    AverageOrder = p.OrderCount > 0 ? (float)(netRevenue / p.OrderCount) : 0
+                };
             }).OrderByDescending(x => x.TotalRevenue).ToList();
 
             var total = allResults.Count;
@@ -424,24 +397,51 @@ namespace Quanlicuahang.Repositories
             skip = skip < 0 ? 0 : skip;
             take = take <= 0 ? 10 : take;
 
-            var query = from oi in _context.OrderItems
-                        join o in _context.Orders on oi.OrderId equals o.Id
-                        join prod in _context.Products on oi.ProductId equals prod.Id
-                        where (fromDate == null || o.OrderDate >= fromDate) && (toDate == null || o.OrderDate <= toDate)
-                              && o.Status == "Completed"
-                              && o.IsDeleted == false
-                        group oi by prod.Name into g
-                        select new TopSellingProductDto
-                        {
-                            ProductName = g.Key,
-                            TotalQuantity = g.Sum(x => x.Quantity),
-                            TotalRevenue = g.Sum(x => x.Subtotal)
-                        };
+            // Query để lấy số lượng đã bán
+            var soldQuery = from oi in _context.OrderItems
+                            join o in _context.Orders on oi.OrderId equals o.Id
+                            join prod in _context.Products on oi.ProductId equals prod.Id
+                            join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
+                            from category in categories.DefaultIfEmpty()
+                            where (fromDate == null || o.OrderDate >= fromDate) 
+                                  && (toDate == null || o.OrderDate <= toDate)
+                                  && o.Status == "Completed"
+                                  && o.IsDeleted == false
+                            group new { oi, category } by new { prod.Id, prod.Name, CategoryName = category != null ? category.Name : "Không phân loại" } into g
+                            select new
+                            {
+                                ProductId = g.Key.Id,
+                                ProductName = g.Key.Name,
+                                CategoryName = g.Key.CategoryName,
+                                TotalQuantity = g.Sum(x => x.oi.Quantity),
+                                TotalRevenue = g.Sum(x => x.oi.Subtotal)
+                            };
 
-            var allResults = await query.AsNoTracking()
-                             .OrderByDescending(x => x.TotalQuantity)
-                             .Take(topN)
-                             .ToListAsync();
+            // Query để lấy số lượng tồn kho
+            var inventoryQuery = from inv in _context.Inventories
+                                 where !inv.IsDeleted
+                                 group inv by inv.ProductId into g
+                                 select new
+                                 {
+                                     ProductId = g.Key,
+                                     StockQuantity = g.Sum(x => x.Quantity)
+                                 };
+
+            var soldProducts = await soldQuery.AsNoTracking().ToListAsync();
+            var inventories = await inventoryQuery.AsNoTracking().ToListAsync();
+
+            // Kết hợp dữ liệu
+            var allResults = soldProducts.Select(sp => new TopSellingProductDto
+            {
+                ProductName = sp.ProductName,
+                CategoryName = sp.CategoryName,
+                TotalQuantity = sp.TotalQuantity,
+                TotalRevenue = sp.TotalRevenue,
+                StockQuantity = inventories.FirstOrDefault(i => i.ProductId == sp.ProductId)?.StockQuantity ?? 0
+            })
+            .OrderByDescending(x => x.TotalQuantity)
+            .Take(topN)
+            .ToList();
 
             var total = allResults.Count;
             var data = allResults.Skip(skip).Take(take).ToList();
@@ -455,26 +455,80 @@ namespace Quanlicuahang.Repositories
             skip = skip < 0 ? 0 : skip;
             take = take <= 0 ? 10 : take;
 
-            var query = from inv in _context.Inventories
-                        join prod in _context.Products on inv.ProductId equals prod.Id
-                        join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
-                        from category in categories.DefaultIfEmpty()
-                        where inv.IsDeleted == false && prod.IsDeleted == false
-                        select new InventoryReportDto
-                        {
-                            ProductName = prod.Name,
-                            Quantity = inv.Quantity,
-                            CategoryName = category != null ? category.Name : "Không phân loại"
-                        };
+            // Query để lấy tồn kho với thông tin sản phẩm
+            var inventoryQuery = from inv in _context.Inventories
+                                 join prod in _context.Products on inv.ProductId equals prod.Id
+                                 join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
+                                 from category in categories.DefaultIfEmpty()
+                                 where inv.IsDeleted == false && prod.IsDeleted == false
+                                 group new { inv, prod, category } by new 
+                                 { 
+                                     prod.Id, 
+                                     prod.Name, 
+                                     prod.Price,
+                                     CategoryName = category != null ? category.Name : "Không phân loại" 
+                                 } into g
+                                 select new
+                                 {
+                                     ProductId = g.Key.Id,
+                                     ProductName = g.Key.Name,
+                                     CategoryName = g.Key.CategoryName,
+                                     UnitPrice = g.Key.Price,
+                                     Quantity = g.Sum(x => x.inv.Quantity)
+                                 };
 
-            var total = await query.CountAsync();
+            // Query để lấy số lượng đã bán (tất cả thời gian)
+            var soldQuery = from oi in _context.OrderItems
+                            join o in _context.Orders on oi.OrderId equals o.Id
+                            where o.Status == "Completed" && !o.IsDeleted
+                            group oi by oi.ProductId into g
+                            select new
+                            {
+                                ProductId = g.Key,
+                                SoldQuantity = g.Sum(x => x.Quantity)
+                            };
 
-            var data = await query.AsNoTracking()
-                .OrderBy(x => x.CategoryName)
-                .ThenBy(x => x.ProductName)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync();
+            var inventories = await inventoryQuery.AsNoTracking().ToListAsync();
+            var soldProducts = await soldQuery.AsNoTracking().ToListAsync();
+
+            // Kết hợp dữ liệu và tính toán trạng thái
+            var allResults = inventories.Select(inv => {
+                var soldQty = soldProducts.FirstOrDefault(sp => sp.ProductId == inv.ProductId)?.SoldQuantity ?? 0;
+                var quantity = inv.Quantity;
+                var inventoryValue = quantity * inv.UnitPrice;
+                
+                // Xác định trạng thái dựa trên số lượng tồn kho
+                string status;
+                if (quantity == 0)
+                {
+                    status = "OutOfStock"; // Hết hàng
+                }
+                else if (quantity <= 10) // Có thể điều chỉnh ngưỡng này
+                {
+                    status = "LowStock"; // Sắp hết
+                }
+                else
+                {
+                    status = "InStock"; // Còn hàng
+                }
+
+                return new InventoryReportDto
+                {
+                    ProductName = inv.ProductName,
+                    CategoryName = inv.CategoryName,
+                    Quantity = quantity,
+                    SoldQuantity = soldQty,
+                    UnitPrice = inv.UnitPrice,
+                    InventoryValue = inventoryValue,
+                    Status = status
+                };
+            })
+            .OrderBy(x => x.CategoryName)
+            .ThenBy(x => x.ProductName)
+            .ToList();
+
+            var total = allResults.Count;
+            var data = allResults.Skip(skip).Take(take).ToList();
 
             return new { data, total };
         }
