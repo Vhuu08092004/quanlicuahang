@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.Helpers;
+using Quanlicuahang.Helpers;
 using Quanlicuahang.Repositories;
 using Quanlicuahang.Services;
 
@@ -50,6 +50,11 @@ namespace Quanlicuahang.Exception
             // Report
             services.AddScoped<IReportRepository, ReportRepository>();
             services.AddScoped<IReportService, ReportService>();
+
+            /* ORDER & PAYMENT */
+            services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IPaymentRepository, PaymentRepository>();
+            services.AddScoped<IPaymentService, PaymentService>();
 
 
             return services;
