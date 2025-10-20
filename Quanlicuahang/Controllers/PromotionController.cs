@@ -9,7 +9,7 @@ namespace Quanlicuahang.Controllers
 {
     [ApiController]
     [Route("api/promotions")]
-    // [Authorize]
+    [Authorize]
     public class PromotionsController : ControllerBase
     {
         private readonly IPromotionService _promotionService;
