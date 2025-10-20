@@ -12,12 +12,15 @@ namespace Quanlicuahang.Exception
             services.AddScoped<ICategoryRepository, CategoryRepository>();
             services.AddScoped<ICategoryService, CategoryService>();
 
+            // Promotion
+            services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<IPromotionService, PromotionService>();
 
-            // Đăng ký Repositorys
+            // User
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<UserService>();
 
-
+            // Auth
             services.AddScoped<IAuthRepository, AuthRepository>();
             services.AddScoped<AuthService>();
 
