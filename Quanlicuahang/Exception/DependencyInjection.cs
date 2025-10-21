@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.Helpers;
+using Quanlicuahang.Helpers;
 using Quanlicuahang.Repositories;
 using Quanlicuahang.Services;
 
@@ -8,7 +8,8 @@ namespace Quanlicuahang.Exception
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-            /* Category*/
+
+            /* Category */
             services.AddScoped<ICategoryRepository, CategoryRepository>();
             services.AddScoped<ICategoryService, CategoryService>();
             /* Customer*/
@@ -17,36 +18,50 @@ namespace Quanlicuahang.Exception
             /* Supplier*/
             services.AddScoped<ISupplierRepository, SupplierRepository>();
             services.AddScoped<ISupplierService, SupplierService>();
-            /*USER*/
+
+            /* USER */
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IUserTokenRepository, UserTokenRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
             services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 
-            /*AUTH*/
+            /* AUTH */
             services.AddScoped<IAuthRepository, AuthRepository>();
             services.AddScoped<AuthService>();
 
-            /*ACTION LOG*/
+            /* ACTION LOG */
             services.AddScoped<IActionLogRepository, ActionLogRepository>();
             services.AddScoped<IActionLogService, ActionLogService>();
 
-            /*PRODUCT*/
+            /* PRODUCT */
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductService, ProductService>();
 
-            /*PRODUCT ATTRIBUTE*/
+            /* PRODUCT ATTRIBUTE */
             services.AddScoped<IProductAttributeRepository, ProductAttributeRepository>();
             services.AddScoped<IProductAttributeService, ProductAttributeService>();
 
-            /*PRODUCT ATTRIBUTE VALUE*/
+            /* PRODUCT ATTRIBUTE VALUE */
             services.AddScoped<IProductAttributeValueRepository, ProductAttributeValueRepository>();
             services.AddScoped<IProductAttributeValueService, ProductAttributeValueService>();
 
-
-            services.AddScoped<IUserTokenRepository, UserTokenRepository>();
+            /* HELPERS */
             services.AddScoped<ITokenHelper, TokenHelper>();
+          
+            /* PROMOTION */
+            services.AddScoped<IPromotionRepository, PromotionRepository>();
+            services.AddScoped<IPromotionService, PromotionService>();
+
+            // Report
+            services.AddScoped<IReportRepository, ReportRepository>();
+            services.AddScoped<IReportService, ReportService>();
+
+            /* ORDER & PAYMENT */
+            services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IPaymentRepository, PaymentRepository>();
+            services.AddScoped<IPaymentService, PaymentService>();
+
 
             return services;
         }
