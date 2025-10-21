@@ -16,7 +16,6 @@ namespace Quanlicuahang.Services
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
         Task<object> GetSelectBoxAsync();
-
     }
 
     public class CategoryService : ICategoryService
