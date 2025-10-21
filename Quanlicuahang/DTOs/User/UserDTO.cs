@@ -1,27 +1,27 @@
-﻿using Quanlicuahang.Enum;
-
-namespace Quanlicuahang.DTOs
+﻿namespace Quanlicuahang.DTOs
 {
-    public class UserRequest
+    public class UserCreateUpdateDto
     {
-        public string? Username { get; set; } 
+        public string Username { get; set; } = string.Empty;
         public string? Password { get; set; }
         public string? FullName { get; set; }
-        public List<Role> Role { get; set; } = new();
+        public string? EmployeeId { get; set; }
+        public List<string>? RoleIds { get; set; } = new();
     }
 
-    public class UserUpdateRequest
+
+    public class UserDto : BaseDto
     {
-        public string? Password { get; set; }
+        public string Username { get; set; } = string.Empty;
         public string? FullName { get; set; }
-        public List<Role> Role { get; set; } = new();
+        public List<string> Roles { get; set; } = new();
     }
 
-    public class UserResponse
+
+    public class UserSearchDto : BaseSearchDto
     {
-        public string? Id { get; set; }         
         public string? Username { get; set; }
         public string? FullName { get; set; }
-        public List<Role> Role { get; set; } = new();
+        public bool? IsDeleted { get; set; }
     }
 }

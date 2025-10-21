@@ -1,23 +1,32 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Quanlicuahang.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Quanlicuahang.Models
+[Table("ProductAttributeValue")]
+public class ProductAttributeValue : BasePrimary
 {
-    [Table("ProductAttributeValue")]
-    public class ProductAttributeValue : BasePrimary
-    {
-        [Required]
-        public string AttributeId { get; set; } = string.Empty;
+    // Liên kết đến Product
+    [Required]
+    public string ProductId { get; set; } = string.Empty;
+    [ForeignKey(nameof(ProductId))]
+    public virtual Product Product { get; set; } = null!;
 
-        [ForeignKey("AttributeId")]
-        public virtual ProductAttribute Attribute { get; set; } = null!;
+    // Liên kết đến Attribute
+    [Required]
+    public string AttributeId { get; set; } = string.Empty;
+    [ForeignKey(nameof(AttributeId))]
+    public virtual ProductAttribute Attribute { get; set; } = null!;
 
-        [Required]
-        [MaxLength(100)]
-        public string Value { get; set; } = string.Empty;
+    [MaxLength(255)]
+    public string? ValueString { get; set; }
 
-        public int DisplayOrder { get; set; } = 0;
+    public decimal? ValueDecimal { get; set; }
 
-        public virtual ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
-    }
+    public int? ValueInt { get; set; }
+
+    public bool? ValueBool { get; set; }
+
+    public DateTime? ValueDate { get; set; }
+
+    public int DisplayOrder { get; set; } = 0;
 }

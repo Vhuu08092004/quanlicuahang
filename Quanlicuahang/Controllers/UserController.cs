@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Quanlicuahang.DTOs;
-
+using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
 {
@@ -8,18 +8,19 @@ namespace Quanlicuahang.Controllers
     [Route("api/users")]
     public class UserController : ControllerBase
     {
-        private readonly Services.UserService _userService;
+        private readonly IUserService _userService;
 
-        public UserController(Services.UserService userService)
+        public UserController(IUserService userService)
         {
             _userService = userService;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllUsers()
+
+        [HttpPost("pagination")]
+        public async Task<IActionResult> GetAllUsers([FromQuery] UserSearchDto searchDto)
         {
-            var users = await _userService.GetAllAsync();
-            return Ok(users);
+            var result = await _userService.GetAllAsync(searchDto);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
@@ -27,28 +28,53 @@ namespace Quanlicuahang.Controllers
         {
             var user = await _userService.GetByIdAsync(id);
             if (user == null)
-            {
                 return NotFound();
-            }
+
             return Ok(user);
         }
 
-        [HttpPost]
-        public async Task<UserResponse> CreateUser([FromBody] UserRequest request)
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateUser([FromBody] UserCreateUpdateDto request)
         {
-            return await _userService.AddAsync(request);
+            try
+            {
+                var user = await _userService.CreateAsync(request);
+                return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        [HttpPut("{id}")]
-        public async Task<UserResponse?> UpdateUser(string id, [FromBody] UserUpdateRequest request)
+        [HttpPut("update/{id}")]
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UserCreateUpdateDto request)
         {
-            return await _userService.UpdateAsync(id, request);
+            try
+            {
+                var result = await _userService.UpdateAsync(id, request);
+                if (!result) return NotFound();
+                return NoContent();
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(string id)
+        [HttpPost("deactive/{id}")]
+        public async Task<IActionResult> DeActiveUser(string id)
         {
-            await _userService.DeleteAsync(id);
+            var result = await _userService.DeActiveAsync(id);
+            if (!result) return NotFound();
+            return NoContent();
+        }
+
+        [HttpPost("activate/{id}")]
+        public async Task<IActionResult> ActivateUser(string id)
+        {
+            var result = await _userService.ActiveAsync(id);
+            if (!result) return NotFound();
             return NoContent();
         }
     }

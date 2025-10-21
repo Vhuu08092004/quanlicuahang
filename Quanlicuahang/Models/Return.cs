@@ -21,7 +21,7 @@ namespace Quanlicuahang.Models
 
         [Required]
         [MaxLength(20)]
-        public string Status { get; set; } = "pending"; // pending, approved, rejected, completed
+        public string Status { get; set; } = "pending";
 
         [MaxLength(500)]
         public string? Reason { get; set; }

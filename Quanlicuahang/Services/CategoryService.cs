@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Quanlicuahang.DTOs;
 using Quanlicuahang.DTOs.Category;
+using Quanlicuahang.Helpers;
 using Quanlicuahang.Models;
 using Quanlicuahang.Repositories;
 
@@ -7,69 +9,108 @@ namespace Quanlicuahang.Services
 {
     public interface ICategoryService
     {
-        Task<object> GetCategoriesAsync(string? search, int page, int pageSize, bool includeDeleted);
-        Task<CategoryDto?> GetCategoryByIdAsync(string id);
-        Task<CategoryDto> CreateCategoryAsync(CategoryCreateUpdateDto dto);
-        Task<bool> UpdateCategoryAsync(string id, CategoryCreateUpdateDto dto);
-        Task<bool> SoftDeleteCategoryAsync(string id);
-        Task<bool> RestoreCategoryAsync(string id);
+        Task<object> GetAllAsync(CategorySearchDto searchDto);
+        Task<CategoryDto?> GetByIdAsync(string id);
+        Task<CategoryDto> CreateAsync(CategoryCreateUpdateDto dto);
+        Task<bool> UpdateAsync(string id, CategoryCreateUpdateDto dto);
+        Task<bool> DeActiveAsync(string id);
+        Task<bool> ActiveAsync(string id);
+        Task<object> GetSelectBoxAsync();
+
     }
 
     public class CategoryService : ICategoryService
     {
-        private readonly ICategoryRepository _repository;
+        private readonly IActionLogService _logService;
+        private readonly IHttpContextAccessor _httpContext;
+        private readonly ITokenHelper _tokenHelper;
+        private readonly ICategoryRepository _repo;
 
-        public CategoryService(ICategoryRepository repository)
+
+        public CategoryService(
+            IActionLogService logService,
+            IHttpContextAccessor httpContext,
+             ITokenHelper tokenHelper,
+            ICategoryRepository repository
+           )
         {
-            _repository = repository;
+            _logService = logService;
+            _httpContext = httpContext;
+            _tokenHelper = tokenHelper;
+            _repo = repository;
+
         }
 
-        public async Task<object> GetCategoriesAsync(string? search, int page, int pageSize, bool includeDeleted)
+        public async Task<object> GetAllAsync(CategorySearchDto searchDto)
         {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
+            var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
+            var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
 
-            var query = _repository.GetAll(includeDeleted);
+            var query = _repo.GetAll(true);
 
-            if (!string.IsNullOrWhiteSpace(search))
+            if (searchDto.Where != null)
             {
-                search = search.Trim().ToLower();
-                query = query.Where(c =>
-                    c.Name.ToLower().Contains(search) ||
-                    c.Code.ToLower().Contains(search));
+                var where = searchDto.Where;
+
+                if (!string.IsNullOrWhiteSpace(where.Code))
+                {
+                    var code = where.Code.Trim().ToLower();
+                    query = query.Where(c => c.Code.ToLower().Contains(code));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.Name))
+                {
+                    var name = where.Name.Trim().ToLower();
+                    query = query.Where(c => c.Name.ToLower().Contains(name));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.Description))
+                {
+                    var description = where.Description.Trim().ToLower();
+                    query = query.Where(c => c.Description != null && c.Description.ToLower().Contains(description));
+                }
+
+                if (where.IsDeleted.HasValue)
+                {
+                    query = query.Where(c => c.IsDeleted == where.IsDeleted.Value);
+                }
             }
 
-            var totalRecords = await query.CountAsync();
+            var total = await query.CountAsync();
 
-            var items = await query
+            var data = await query
                 .OrderByDescending(c => c.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
+                .Skip(skip)
+                .Take(take)
                 .Select(c => new CategoryDto
                 {
                     Id = c.Id,
                     Code = c.Code,
                     Name = c.Name,
                     Description = c.Description,
+                    IsDeleted = c.IsDeleted,
                     CreatedAt = c.CreatedAt,
                     UpdatedAt = c.UpdatedAt,
-                    IsDeleted = c.IsDeleted
+                    CreatedBy = c.CreatedBy,
+                    UpdatedBy = c.UpdatedBy,
+                    isCanView = true,
+                    isCanCreate = true,
+                    isCanEdit = !c.IsDeleted,
+                    isCanDeActive = !c.IsDeleted,
+                    isCanActive = c.IsDeleted
                 })
                 .ToListAsync();
 
             return new
             {
-                totalRecords,
-                page,
-                pageSize,
-                totalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
-                items
+                data,
+                total
             };
         }
 
-        public async Task<CategoryDto?> GetCategoryByIdAsync(string id)
+        public async Task<CategoryDto?> GetByIdAsync(string id)
         {
-            var category = await _repository.GetAll(true)
+            var category = await _repo.GetAll(true)
                 .Where(c => c.Id == id)
                 .Select(c => new CategoryDto
                 {
@@ -86,69 +127,218 @@ namespace Quanlicuahang.Services
             return category;
         }
 
-        public async Task<CategoryDto> CreateCategoryAsync(CategoryCreateUpdateDto dto)
+        public async Task<CategoryDto> CreateAsync(CategoryCreateUpdateDto dto)
         {
+            if (await _repo.ExistsAsync(c => c.Code == dto.Code))
+                throw new System.Exception($"Mã danh mục '{dto.Code}' đã tồn tại!");
+
+            if (await _repo.ExistsAsync(c => c.Name == dto.Name))
+                throw new System.Exception($"Tên danh mục '{dto.Name}' đã tồn tại!");
+
+            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
+            }
+
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
             var category = new Category
             {
                 Id = Guid.NewGuid().ToString(),
                 Code = dto.Code,
                 Name = dto.Name,
                 Description = dto.Description,
+                CreatedBy = userId,
+                UpdatedBy = userId,
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                IsDeleted = false
+                UpdatedAt = DateTime.UtcNow
             };
 
-            await _repository.AddAsync(category);
-            await _repository.SaveChangesAsync();
+            await _repo.AddAsync(category);
+            await _repo.SaveChangesAsync();
 
-            return new CategoryDto
-            {
-                Id = category.Id,
-                Code = category.Code,
-                Name = category.Name,
-                Description = category.Description,
-                CreatedAt = category.CreatedAt,
-                UpdatedAt = category.UpdatedAt,
-                IsDeleted = category.IsDeleted
-            };
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "Create",
+                entityType: "Categories",
+                entityId: category.Id,
+                description: $"Tạo mới danh mục {category.Code} - {category.Name}",
+                oldValue: null,
+                newValue: category,
+                userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
+            return (await GetByIdAsync(category.Id))!;
         }
 
-        public async Task<bool> UpdateCategoryAsync(string id, CategoryCreateUpdateDto dto)
+        public async Task<bool> UpdateAsync(string id, CategoryCreateUpdateDto dto)
         {
-            var category = await _repository.GetByIdAsync(id);
-            if (category == null) return false;
+            var category = await _repo.GetByIdAsync(id);
+            if (category == null) throw new System.Exception("Danh mục không tồn tại!");
 
+            if (category.Code != dto.Code)
+            {
+                var codeExists = await _repo.ExistsAsync(
+                    c => c.Code == dto.Code && !c.IsDeleted,
+                    excludeId: id
+                );
+
+                if (codeExists)
+                    throw new System.Exception($"Mã danh mục '{dto.Code}' đã tồn tại!");
+            }
+
+            if (category.Name != dto.Name)
+            {
+                var nameExists = await _repo.ExistsAsync(
+                    c => c.Name == dto.Name && !c.IsDeleted,
+                    excludeId: id
+                );
+
+                if (nameExists)
+                    throw new System.Exception($"Tên danh mục '{dto.Name}' đã tồn tại!");
+            }
+
+            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
+            }
+
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            var oldValue = new { category.Code, category.Name, category.Description };
             category.Code = dto.Code;
             category.Name = dto.Name;
             category.Description = dto.Description;
+            category.UpdatedBy = userId;
             category.UpdatedAt = DateTime.UtcNow;
+            _repo.Update(category);
+            await _repo.SaveChangesAsync();
 
-            await _repository.UpdateAsync(category);
-            await _repository.SaveChangesAsync();
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "Update",
+                entityType: "Categories",
+                entityId: category.Id,
+                description: $"Cập nhật danh mục {category.Code} - {category.Name}",
+                oldValue: oldValue,
+                newValue: category,
+                userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
             return true;
         }
 
-        public async Task<bool> SoftDeleteCategoryAsync(string id)
+        public async Task<bool> DeActiveAsync(string id)
         {
-            var category = await _repository.GetByIdAsync(id);
+            var category = await _repo.GetByIdAsync(id);
             if (category == null) return false;
+
+            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
+            }
+
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            var oldValue = new
+            {
+                category.IsDeleted,
+                category.UpdatedAt
+            };
 
             category.IsDeleted = true;
             category.UpdatedAt = DateTime.UtcNow;
-            await _repository.SaveChangesAsync();
+            category.UpdatedBy = userId;
+            await _repo.SaveChangesAsync();
+
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "DeActive",
+                entityType: "Categories",
+                entityId: category.Id,
+                description: $"Ngưng hoạt động danh mục {category.Code} - {category.Name}",
+                oldValue: oldValue,
+                newValue: new { category.IsDeleted, category.UpdatedAt },
+                userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
             return true;
         }
 
-        public async Task<bool> RestoreCategoryAsync(string id)
+        public async Task<bool> ActiveAsync(string id)
         {
-            var category = await _repository.GetByIdAsync(id);
+            var category = await _repo.GetByIdAsync(id);
             if (category == null) return false;
+
+            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
+            }
+
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            var oldValue = new
+            {
+                category.IsDeleted,
+                category.UpdatedAt
+            };
 
             category.IsDeleted = false;
             category.UpdatedAt = DateTime.UtcNow;
-            await _repository.SaveChangesAsync();
+            category.UpdatedBy = userId;
+            await _repo.SaveChangesAsync();
+
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "Active",
+                entityType: "Categories",
+                entityId: category.Id,
+                description: $"Kích hoạt danh mục {category.Code} - {category.Name}",
+                oldValue: oldValue,
+                newValue: new { category.IsDeleted, category.UpdatedAt },
+                userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
             return true;
         }
+
+        public async Task<object> GetSelectBoxAsync()
+        {
+            var query = _repo.GetAll(false)
+                .OrderBy(c => c.Name)
+                .Select(c => new SelectBoxDto
+                {
+                    Id = c.Id,
+                    Code = c.Code,
+                    Name = c.Name
+                });
+
+            var data = await query.ToListAsync();
+            var total = data.Count;
+
+            return new
+            {
+                data,
+                total
+            };
+        }
+
+
     }
 }
