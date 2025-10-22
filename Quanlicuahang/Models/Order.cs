@@ -1,14 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Quanlicuahang.Models
 {
     [Table("Order")]
     public class Order : BasePrimary
-    {
+    {   
 
-        [Required]
-        [MaxLength(50)]
+        [Required, MaxLength(50)]
         public string Code { get; set; } = string.Empty;
 
         public string? CustomerId { get; set; }
