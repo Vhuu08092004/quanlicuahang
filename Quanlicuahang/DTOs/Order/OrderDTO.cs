@@ -8,6 +8,7 @@ namespace Quanlicuahang.DTOs.Order
         public string Code { get; set; } = string.Empty;
         public string? CustomerId { get; set; }
         public string? CustomerName { get; set; }
+        public string? PromotionId { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal DiscountAmount { get; set; }
         public string Status { get; set; } = "pending";
@@ -20,6 +21,8 @@ namespace Quanlicuahang.DTOs.Order
         public bool isCanEdit { get; set; } = true;
         public bool isCanDeActive { get; set; } = true;
         public bool isCanActive { get; set; } = false;
+
+        public List<OrderItemDto> Items { get; set; } = new();
     }
 
     public class OrderItemCreateDto
@@ -41,6 +44,15 @@ namespace Quanlicuahang.DTOs.Order
         public string? PromotionId { get; set; }
         public decimal DiscountAmount { get; set; }
         public decimal TotalAmount { get; set; }
+    }
+
+    public class OrderItemDto
+    {
+        public string ProductId { get; set; } = string.Empty;
+        public string? ProductCode { get; set; }
+        public string? ProductName { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
     }
 
     public class OrderWhereDto

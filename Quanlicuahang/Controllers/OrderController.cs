@@ -65,9 +65,10 @@ namespace Quanlicuahang.Controllers
         {
             try
             {
-                var result = await _service.UpdateAsync(id, dto);
-                if (!result) return NotFound("Không tìm thấy đơn hàng");
-                return Ok("Cập nhật đơn hàng thành công");
+                var updated = await _service.UpdateAsync(id, dto);
+                if (!updated) return NotFound("Không tìm thấy đơn hàng");
+                var after = await _service.GetByIdAsync(id);
+                return Ok(after);
             }
             catch (System.Exception ex)
             {

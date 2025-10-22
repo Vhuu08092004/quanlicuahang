@@ -41,7 +41,7 @@ namespace Quanlicuahang.Services
 
             promotion.CreatedBy = userId;
             promotion.UpdatedBy = userId;
-            
+
             return await _promotionRepository.CreatePromotionAsync(promotion);
         }
 
