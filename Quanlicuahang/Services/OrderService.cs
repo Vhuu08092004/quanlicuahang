@@ -93,6 +93,7 @@ namespace Quanlicuahang.Services
                 {
                     Id = o.Id,
                     Code = o.Code,
+                    CustomerId = o.CustomerId,
                     CustomerName = o.Customer != null ? o.Customer.Name : null,
                     TotalAmount = o.TotalAmount - o.DiscountAmount, // FE expects net
                     DiscountAmount = o.DiscountAmount,
@@ -121,6 +122,7 @@ namespace Quanlicuahang.Services
                 {
                     Id = o.Id,
                     Code = o.Code,
+                    CustomerId = o.CustomerId,
                     CustomerName = o.Customer != null ? o.Customer.Name : null,
                     TotalAmount = o.TotalAmount - o.DiscountAmount,
                     DiscountAmount = o.DiscountAmount,
@@ -144,7 +146,10 @@ namespace Quanlicuahang.Services
                 if (item.UnitPrice < 0)
                     throw new System.Exception("Đơn giá không hợp lệ");
 
-                var available = await _inventoryRepo.GetAvailableQuantityAsync(item.ProductId);
+                var product = await _productRepo.GetByIdAsync(item.ProductId);
+                if (product == null || product.IsDeleted)
+                    throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+                var available = product.Quantity;
                 if (available < item.Quantity)
                     throw new System.Exception($"Sản phẩm {item.ProductId} không đủ tồn kho. Còn {available}");
             }
@@ -204,6 +209,23 @@ namespace Quanlicuahang.Services
                 order.OrderItems.Add(oi);
             }
 
+            // Update product stock quantities (decrease by ordered quantities)
+            var grouped = dto.Items
+                .GroupBy(x => x.ProductId)
+                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                .ToList();
+            foreach (var g in grouped)
+            {
+                var prod = await _productRepo.GetByIdAsync(g.ProductId);
+                if (prod != null)
+                {
+                    prod.Quantity = Math.Max(0, prod.Quantity - g.Qty);
+                    prod.UpdatedBy = userId;
+                    prod.UpdatedAt = DateTime.UtcNow;
+                    _productRepo.Update(prod);
+                }
+            }
+
             // Persist order + items
             await _orderRepo.SaveChangesAsync();
 
@@ -260,6 +282,7 @@ namespace Quanlicuahang.Services
             if (string.IsNullOrEmpty(userId))
                 throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
 
+            order.CustomerId = string.IsNullOrWhiteSpace(dto.CustomerId) ? null : dto.CustomerId;
             order.PromoId = string.IsNullOrWhiteSpace(dto.PromotionId) ? null : dto.PromotionId;
             order.DiscountAmount = dto.DiscountAmount;
             order.UpdatedBy = userId;

@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.Models;
+using Quanlicuahang.Models;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -19,6 +19,8 @@ public class Product : BasePrimary
 
     [MaxLength(20)]
     public string Unit { get; set; } = "pcs";
+
+    public int Quantity { get; set; } = 0;
 
     public string? CategoryId { get; set; }
     [ForeignKey(nameof(CategoryId))]

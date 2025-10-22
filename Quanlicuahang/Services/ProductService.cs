@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.DTOs;
 using Quanlicuahang.DTOs.Product;
 using Quanlicuahang.DTOs.ProductAttribute;
@@ -99,6 +99,7 @@ namespace Quanlicuahang.Services
                     Barcode = p.Barcode,
                     Price = p.Price,
                     Unit = p.Unit,
+                    Quantity = p.Quantity,
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
                     SupplierId = p.SupplierId,
@@ -133,6 +134,7 @@ namespace Quanlicuahang.Services
                     Barcode = p.Barcode,
                     Price = p.Price,
                     Unit = p.Unit,
+                    Quantity = p.Quantity,
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
                     SupplierId = p.SupplierId,

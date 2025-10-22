@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.DTOs.ProductAttribute;
+using Quanlicuahang.DTOs.ProductAttribute;
 
 namespace Quanlicuahang.DTOs.Product
 {
@@ -9,6 +9,7 @@ namespace Quanlicuahang.DTOs.Product
         public string? Barcode { get; set; }
         public decimal Price { get; set; }
         public string Unit { get; set; } = "pcs";
+        public int Quantity { get; set; }
         public string? CategoryId { get; set; }
         public string? CategoryName { get; set; }
         public string? SupplierId { get; set; }
