@@ -1,4 +1,4 @@
-﻿using Mysqlx.Crud;
+using Mysqlx.Crud;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -19,5 +19,8 @@ namespace Quanlicuahang.Models
         public string PaymentMethod { get; set; } = "cash";
 
         public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
+
+        [MaxLength(500)]
+        public string? Note { get; set; }
     }
 }

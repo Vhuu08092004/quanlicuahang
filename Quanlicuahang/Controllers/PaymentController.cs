@@ -60,12 +60,28 @@ namespace Quanlicuahang.Controllers
             }
         }
 
-        [HttpPost("deactive/{id}")]
-        public async Task<IActionResult> DeActive([FromRoute] string id)
+        [HttpPut("update/{id}")]
+        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] PaymentUpdateDto dto)
         {
             try
             {
-                var result = await _service.DeActiveAsync(id);
+                var ok = await _service.UpdateAsync(id, dto);
+                if (!ok) return NotFound("Thanh toán không tồn tại");
+                var after = await _service.GetByIdAsync(id);
+                return Ok(after);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("deactive/{id}")]
+        public async Task<IActionResult> DeActive([FromRoute] string id, [FromBody] ChangeActiveDto? dto)
+        {
+            try
+            {
+                var result = await _service.DeActiveAsync(id, dto?.Reason);
                 if (!result) return NotFound("Thanh toán không tồn tại");
                 return Ok("Vô hiệu hóa thanh toán thành công");
             }
@@ -76,11 +92,11 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost("active/{id}")]
-        public async Task<IActionResult> Active([FromRoute] string id)
+        public async Task<IActionResult> Active([FromRoute] string id, [FromBody] ChangeActiveDto? dto)
         {
             try
             {
-                var result = await _service.ActiveAsync(id);
+                var result = await _service.ActiveAsync(id, dto?.Reason);
                 if (!result) return NotFound("Thanh toán không tồn tại");
                 return Ok("Kích hoạt thanh toán thành công");
             }
