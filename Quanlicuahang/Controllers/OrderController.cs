@@ -61,14 +61,12 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPut("update/{id}")]
-        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] OrderCreateDto dto)
+        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] OrderUpdateDto dto)
         {
             try
             {
-                var updated = await _service.UpdateAsync(id, dto);
-                if (!updated) return NotFound("Không tìm thấy đơn hàng");
-                var after = await _service.GetByIdAsync(id);
-                return Ok(after);
+                var result = await _service.UpdateAsync(id, dto);
+                return Ok(result);
             }
             catch (System.Exception ex)
             {
