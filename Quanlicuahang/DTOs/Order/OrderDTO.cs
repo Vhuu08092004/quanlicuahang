@@ -13,6 +13,7 @@ namespace Quanlicuahang.DTOs.Order
         public decimal DiscountAmount { get; set; }
         public string Status { get; set; } = "pending";
         public DateTime CreatedAt { get; set; }
+        public string? CreatedByName { get; set; }
         public bool IsDeleted { get; set; }
 
         // Optional action flags for FE
@@ -21,6 +22,10 @@ namespace Quanlicuahang.DTOs.Order
         public bool isCanEdit { get; set; } = true;
         public bool isCanDeActive { get; set; } = true;
         public bool isCanActive { get; set; } = false;
+        public bool isCanUpdateStatus { get; set; } = true;
+        public bool isCanCancel { get; set; } = true;
+        public bool isCanDeliver { get; set; } = true;
+        public bool isCanComplete { get; set; } = true;
 
         public List<OrderItemDto> Items { get; set; } = new();
     }
@@ -44,6 +49,17 @@ namespace Quanlicuahang.DTOs.Order
         public string? PromotionId { get; set; }
         public decimal DiscountAmount { get; set; }
         public decimal TotalAmount { get; set; }
+    }
+
+    public class OrderUpdateDto
+    {
+        public string? CustomerId { get; set; }
+        public string? CustomerName { get; set; }
+        public List<OrderItemCreateDto>? Items { get; set; }
+        public string? PromotionId { get; set; }
+        public decimal? DiscountAmount { get; set; }
+        public decimal? TotalAmount { get; set; }
+        public string? Status { get; set; }
     }
 
     public class OrderItemDto

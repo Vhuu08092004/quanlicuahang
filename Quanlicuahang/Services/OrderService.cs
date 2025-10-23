@@ -11,7 +11,7 @@ namespace Quanlicuahang.Services
         Task<object> GetAllAsync(OrderSearchDto searchDto);
         Task<OrderDto?> GetByIdAsync(string id);
         Task<OrderDto> CreateAsync(OrderCreateDto dto);
-        Task<bool> UpdateAsync(string id, OrderCreateDto dto);
+        Task<OrderDto> UpdateAsync(string id, OrderUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
     }
@@ -48,6 +48,7 @@ namespace Quanlicuahang.Services
 
             var query = _orderRepo.GetAll(true)
                 .Include(o => o.Customer)
+                .Include(o => o.User)
                 .AsQueryable();
 
             if (searchDto.Where != null)
@@ -95,16 +96,22 @@ namespace Quanlicuahang.Services
                     Code = o.Code,
                     CustomerId = o.CustomerId,
                     CustomerName = o.Customer != null ? o.Customer.Name : null,
+                    PromotionId = o.PromoId,
                     TotalAmount = o.TotalAmount - o.DiscountAmount, // FE expects net
                     DiscountAmount = o.DiscountAmount,
                     Status = o.Status,
                     CreatedAt = o.CreatedAt,
+                    CreatedByName = o.User != null ? o.User.FullName : null,
                     IsDeleted = o.IsDeleted,
                     isCanView = true,
                     isCanCreate = true,
-                    isCanEdit = !o.IsDeleted,
+                    isCanEdit = o.Status.ToLower() == "pending" && !o.IsDeleted,
                     isCanDeActive = !o.IsDeleted,
-                    isCanActive = o.IsDeleted
+                    isCanActive = o.IsDeleted,
+                    isCanUpdateStatus = !o.IsDeleted,
+                    isCanCancel = o.Status.ToLower() == "pending" && !o.IsDeleted,
+                    isCanDeliver = (o.Status.ToLower() == "pending" || o.Status.ToLower() == "paid") && !o.IsDeleted,
+                    isCanComplete = (o.Status.ToLower() == "delivering" || o.Status.ToLower() == "pending" || o.Status.ToLower() == "paid") && !o.IsDeleted
                 })
                 .ToListAsync();
 
@@ -115,6 +122,7 @@ namespace Quanlicuahang.Services
         {
             var order = await _orderRepo.GetAll(true)
                 .Include(o => o.Customer)
+                .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
                 .Where(o => o.Id == id)
@@ -129,6 +137,7 @@ namespace Quanlicuahang.Services
                     DiscountAmount = o.DiscountAmount,
                     Status = o.Status,
                     CreatedAt = o.CreatedAt,
+                    CreatedByName = o.User != null ? (o.User.FullName ?? o.User.Username) : null,
                     IsDeleted = o.IsDeleted,
                     Items = o.OrderItems
                     .Where(oi => !oi.IsDeleted)
@@ -184,6 +193,7 @@ namespace Quanlicuahang.Services
                 Id = Guid.NewGuid().ToString(),
                 Code = GenerateCode("ORDER"),
                 CustomerId = string.IsNullOrWhiteSpace(dto.CustomerId) ? null : dto.CustomerId,
+                UserId = userId,
                 PromoId = string.IsNullOrWhiteSpace(dto.PromotionId) ? null : dto.PromotionId,
                 OrderDate = DateTime.UtcNow,
                 Status = "pending",
@@ -283,116 +293,217 @@ namespace Quanlicuahang.Services
             return (await GetByIdAsync(order.Id))!;
         }
 
-        public async Task<bool> UpdateAsync(string id, OrderCreateDto dto)
+        public async Task<OrderDto> UpdateAsync(string id, OrderUpdateDto dto)
         {
             // Load existing order with items
             var order = await _orderRepo.GetAll(true)
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.Id == id);
-            if (order == null) return false;
-
-            if (dto.Items == null || dto.Items.Count == 0)
-                throw new System.Exception("Đơn hàng phải có ít nhất một sản phẩm");
+            if (order == null) throw new System.Exception("Không tìm thấy đơn hàng");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
                 throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
 
-            // Validate new items and compute grouped quantities
-            foreach (var item in dto.Items)
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            // 1) Cập nhật trạng thái nếu có
+            if (!string.IsNullOrWhiteSpace(dto.Status))
             {
-                if (item.Quantity <= 0)
-                    throw new System.Exception("Số lượng phải > 0");
-                if (item.UnitPrice < 0)
-                    throw new System.Exception("Đơn giá không hợp lệ");
-                var product = await _productRepo.GetByIdAsync(item.ProductId);
-                if (product == null || product.IsDeleted)
-                    throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+                var from = (order.Status ?? "pending").Trim().ToLower();
+                var to = dto.Status!.Trim().ToLower();
+
+                var allowed =
+                    (from == "pending" && (to == "paid" || to == "cancelled" || to == "delivering")) ||
+                    (from == "paid" && (to == "delivering")) ||
+                    (from == "delivering" && (to == "completed"));
+
+                if (!allowed)
+                    throw new System.Exception($"Chuyển trạng thái {from} -> {to} không hợp lệ.");
+
+                if (to == "cancelled")
+                {
+                    // Hoàn kho theo số lượng hiện tại của đơn
+                    var groups = order.OrderItems.Where(oi => !oi.IsDeleted)
+                        .GroupBy(i => i.ProductId)
+                        .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                        .ToList();
+                    foreach (var g in groups)
+                    {
+                        var prod = await _productRepo.GetByIdAsync(g.ProductId);
+                        if (prod != null)
+                        {
+                            prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
+                            prod.UpdatedBy = userId;
+                            prod.UpdatedAt = DateTime.UtcNow;
+                            _productRepo.Update(prod);
+
+                            var inv = new Inventory
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                Code = GenerateCode("INVRET"),
+                                ProductId = g.ProductId,
+                                Quantity = Math.Abs(g.Qty),
+                                CreatedBy = userId,
+                                UpdatedBy = userId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow,
+                                IsDeleted = false
+                            };
+                            await _inventoryRepo.AddAsync(inv);
+                        }
+                    }
+                }
+
+                order.Status = to;
+                order.UpdatedBy = userId;
+                order.UpdatedAt = DateTime.UtcNow;
+                _orderRepo.Update(order);
+                await _orderRepo.SaveChangesAsync();
+
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "UpdateStatus",
+                    entityType: "Orders",
+                    entityId: order.Id,
+                    description: $"Cập nhật trạng thái: {from} -> {to}",
+                    oldValue: new { Status = from },
+                    newValue: new { Status = to },
+                    userId: userId,
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                return (await GetByIdAsync(order.Id))!;
             }
 
-            var oldGroups = order.OrderItems
-                .GroupBy(x => x.ProductId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
-            var newGroups = dto.Items
-                .GroupBy(x => x.ProductId)
-                .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+            // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending
+            if ((order.Status ?? "").Trim().ToLower() != "pending")
+                throw new System.Exception("Chỉ cho phép chỉnh sửa khi đơn hàng đang Pending");
 
-            // Adjust stock based on delta quantities
-            var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
-            foreach (var pid in affectedProductIds)
+            // Validate items nếu được truyền vào
+            if (dto.Items != null)
             {
-                var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
-                var newQty = newGroups.ContainsKey(pid) ? newGroups[pid] : 0;
-                var delta = newQty - oldQty; // positive means more stock to deduct
+                if (dto.Items.Count == 0)
+                    throw new System.Exception("Đơn hàng phải có ít nhất một sản phẩm");
 
-                if (delta != 0)
+                foreach (var item in dto.Items)
                 {
-                    var product = await _productRepo.GetByIdAsync(pid);
-                    if (product == null)
-                        throw new System.Exception($"Sản phẩm {pid} không tồn tại");
+                    if (item.Quantity <= 0)
+                        throw new System.Exception("Số lượng phải > 0");
+                    if (item.UnitPrice < 0)
+                        throw new System.Exception("Đơn giá không hợp lệ");
+                    var product = await _productRepo.GetByIdAsync(item.ProductId);
+                    if (product == null || product.IsDeleted)
+                        throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+                }
 
-                    if (delta > 0 && product.Quantity < delta)
-                        throw new System.Exception($"Sản phẩm {pid} không đủ tồn kho. Cần thêm {delta}, còn {product.Quantity}");
+                var oldGroups = order.OrderItems
+                    .GroupBy(x => x.ProductId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+                var newGroups = dto.Items
+                    .GroupBy(x => x.ProductId)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
 
-                    product.Quantity = product.Quantity - delta; // delta>0 deduct, delta<0 add back
-                    product.UpdatedBy = userId;
-                    product.UpdatedAt = DateTime.UtcNow;
-                    _productRepo.Update(product);
+                // Điều chỉnh tồn kho theo delta
+                var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
+                foreach (var pid in affectedProductIds)
+                {
+                    var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
+                    var newQty = newGroups.ContainsKey(pid) ? newGroups[pid] : 0;
+                    var delta = newQty - oldQty; // >0: trừ thêm, <0: trả lại
 
-                    // Add inventory adjustment record
-                    var inv = new Inventory
+                    if (delta != 0)
+                    {
+                        var product = await _productRepo.GetByIdAsync(pid);
+                        if (product == null)
+                            throw new System.Exception($"Sản phẩm {pid} không tồn tại");
+
+                        if (delta > 0 && product.Quantity < delta)
+                            throw new System.Exception($"Sản phẩm {pid} không đủ tồn kho. Cần thêm {delta}, còn {product.Quantity}");
+
+                        product.Quantity = product.Quantity - delta;
+                        product.UpdatedBy = userId;
+                        product.UpdatedAt = DateTime.UtcNow;
+                        _productRepo.Update(product);
+
+                        var inv = new Inventory
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            Code = GenerateCode("INVADJ"),
+                            ProductId = pid,
+                            Quantity = -delta, // delta>0 xuất kho, delta<0 nhập trả
+                            CreatedBy = userId,
+                            UpdatedBy = userId,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow,
+                            IsDeleted = false
+                        };
+                        await _inventoryRepo.AddAsync(inv);
+                    }
+                }
+
+                // Soft-delete toàn bộ items cũ
+                foreach (var oi in order.OrderItems)
+                {
+                    oi.IsDeleted = true;
+                    oi.UpdatedBy = userId;
+                    oi.UpdatedAt = DateTime.UtcNow;
+                }
+
+                // Thêm items mới
+                foreach (var item in dto.Items)
+                {
+                    order.OrderItems.Add(new OrderItem
                     {
                         Id = Guid.NewGuid().ToString(),
-                        Code = GenerateCode("INVADJ"),
-                        ProductId = pid,
-                        Quantity = -delta, // positive stock out when delta>0
+                        OrderId = order.Id,
+                        ProductId = item.ProductId,
+                        Quantity = item.Quantity,
+                        Price = item.UnitPrice,
+                        Subtotal = item.UnitPrice * item.Quantity,
                         CreatedBy = userId,
                         UpdatedBy = userId,
                         CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow,
-                        IsDeleted = false
-                    };
-                    await _inventoryRepo.AddAsync(inv);
+                        UpdatedAt = DateTime.UtcNow
+                    });
                 }
+
+                // Cập nhật tổng tiền theo items mới
+                order.TotalAmount = dto.Items.Sum(x => x.UnitPrice * x.Quantity);
             }
 
-            // Soft-delete old items
-            foreach (var oi in order.OrderItems)
-            {
-                oi.IsDeleted = true;
-                oi.UpdatedBy = userId;
-                oi.UpdatedAt = DateTime.UtcNow;
-            }
+            // Cập nhật các field khác nếu được truyền
+            if (!string.IsNullOrWhiteSpace(dto.CustomerId))
+                order.CustomerId = dto.CustomerId;
+            if (!string.IsNullOrWhiteSpace(dto.PromotionId))
+                order.PromoId = dto.PromotionId;
+            if (dto.DiscountAmount.HasValue)
+                order.DiscountAmount = dto.DiscountAmount.Value;
+            if (dto.TotalAmount.HasValue && dto.Items == null)
+                order.TotalAmount = dto.TotalAmount.Value;
 
-            // Add new items
-            foreach (var item in dto.Items)
-            {
-                order.OrderItems.Add(new OrderItem
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    OrderId = order.Id,
-                    ProductId = item.ProductId,
-                    Quantity = item.Quantity,
-                    Price = item.UnitPrice,
-                    Subtotal = item.UnitPrice * item.Quantity,
-                    CreatedBy = userId,
-                    UpdatedBy = userId,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                });
-            }
-
-            // Update order totals and fields
-            order.CustomerId = string.IsNullOrWhiteSpace(dto.CustomerId) ? null : dto.CustomerId;
-            order.PromoId = string.IsNullOrWhiteSpace(dto.PromotionId) ? null : dto.PromotionId;
-            order.TotalAmount = dto.Items.Sum(x => x.UnitPrice * x.Quantity);
-            order.DiscountAmount = dto.DiscountAmount;
             order.UpdatedBy = userId;
             order.UpdatedAt = DateTime.UtcNow;
 
             _orderRepo.Update(order);
             await _orderRepo.SaveChangesAsync();
-            return true;
+
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "Update",
+                entityType: "Orders",
+                entityId: order.Id,
+                description: $"Cập nhật đơn hàng {order.Code}",
+                oldValue: null,
+                newValue: new { order.CustomerId, order.PromoId, order.TotalAmount, order.DiscountAmount },
+                userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
+            return (await GetByIdAsync(order.Id))!;
         }
 
         public Task<bool> DeActiveAsync(string id) => _orderRepo.DeActiveAsync(id);
