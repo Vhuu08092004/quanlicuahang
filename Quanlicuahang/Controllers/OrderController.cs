@@ -103,5 +103,19 @@ namespace Quanlicuahang.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("customer/{customerId}/history")]
+        public async Task<IActionResult> GetPurchaseHistory([FromRoute] string customerId)
+        {
+            try
+            {
+                var result = await _service.GetPurchaseHistoryByCustomerAsync(customerId);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }
