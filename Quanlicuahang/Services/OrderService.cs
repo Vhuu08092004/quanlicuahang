@@ -14,6 +14,7 @@ namespace Quanlicuahang.Services
         Task<OrderDto> UpdateAsync(string id, OrderUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
+        Task<List<OrderDto>> GetPurchaseHistoryByCustomerAsync(string customerId);
     }
 
     public class OrderService : IOrderService
@@ -515,6 +516,48 @@ namespace Quanlicuahang.Services
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var randomPart = Guid.NewGuid().ToString("N").Substring(0, 6);
             return $"{prefix.ToLower()}-{timestamp}-{randomPart}";
+        }
+
+        public async Task<List<OrderDto>> GetPurchaseHistoryByCustomerAsync(string customerId)
+        {
+            if (string.IsNullOrWhiteSpace(customerId))
+            {
+                throw new ArgumentException("Mã khách hàng không hợp lệ");
+            }
+
+            var orders = await _orderRepo.GetAll(true)
+                .Include(o => o.Customer)
+                .Include(o => o.User)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
+                .Where(o => o.CustomerId == customerId && !o.IsDeleted)
+                .OrderByDescending(o => o.CreatedAt)
+                .Select(o => new OrderDto
+                {
+                    Id = o.Id,
+                    Code = o.Code,
+                    CustomerId = o.CustomerId,
+                    CustomerName = o.Customer != null ? o.Customer.Name : null,
+                    TotalAmount = o.TotalAmount - o.DiscountAmount,
+                    DiscountAmount = o.DiscountAmount,
+                    Status = o.Status,
+                    CreatedAt = o.CreatedAt,
+                    CreatedByName = o.User != null ? (o.User.FullName ?? o.User.Username) : null,
+                    Items = o.OrderItems
+                        .Where(oi => !oi.IsDeleted)
+                        .Select(oi => new OrderItemDto
+                        {
+                            ProductId = oi.ProductId,
+                            ProductCode = oi.Product != null ? oi.Product.Code : null,
+                            ProductName = oi.Product != null ? oi.Product.Name : null,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.Price
+                        })
+                        .ToList()
+                })
+                .ToListAsync();
+
+            return orders;
         }
     }
 }
