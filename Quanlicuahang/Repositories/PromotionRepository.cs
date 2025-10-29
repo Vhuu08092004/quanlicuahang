@@ -10,7 +10,7 @@ namespace Quanlicuahang.Repositories
 {
     public interface IPromotionRepository
     {
-        Task<List<Promotion>> GetAllPromotionsAsync();
+        IQueryable<Promotion> GetPromotionsQuery(bool includeDeleted = false);
         Task<Promotion?> GetPromotionByIdAsync(string id);
         Task<PromotionDetailDTO?> GetPromotionDetailByIdAsync(string id);
         Task<Promotion> CreatePromotionAsync(Promotion promotion);
@@ -30,12 +30,14 @@ namespace Quanlicuahang.Repositories
             _userRepository = userRepository;
         }
 
-        public async Task<List<Promotion>> GetAllPromotionsAsync()
+        public IQueryable<Promotion> GetPromotionsQuery(bool includeDeleted = false)
         {
-            return await _context.Promotions
-                .Include(p => p.Orders)
-                .Where(p => p.IsDeleted == false)
-                .ToListAsync();
+            var query = _context.Promotions.AsQueryable();
+            if (!includeDeleted)
+            {
+                query = query.Where(p => p.IsDeleted == false);
+            }
+            return query;
         }
 
         public async Task<Promotion?> GetPromotionByIdAsync(string id)

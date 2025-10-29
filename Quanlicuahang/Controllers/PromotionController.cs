@@ -20,11 +20,11 @@ namespace Quanlicuahang.Controllers
             _promotionService = promotionService;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<Promotion>>> GetAllPromotions()
+        [HttpPost("pagination")]
+        public async Task<ActionResult> GetAllPromotions([FromBody] PromotionSearchDto searchDto)
         {
-            var promotions = await _promotionService.GetAllPromotionsAsync();
-            return Ok(promotions);
+            var result = await _promotionService.GetAllPromotionsAsync(searchDto);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
