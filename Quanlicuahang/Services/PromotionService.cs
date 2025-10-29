@@ -1,4 +1,5 @@
 using Quanlicuahang.DTOs.Order;
+using Quanlicuahang.DTOs.Promotion;
 using Quanlicuahang.Models;
 using Quanlicuahang.Repositories;
 using System.ComponentModel.DataAnnotations;
@@ -9,9 +10,12 @@ namespace Quanlicuahang.Services
     {
         Task<List<Promotion>> GetAllPromotionsAsync();
         Task<Promotion?> GetPromotionByIdAsync(string id);
+        Task<PromotionDetailDTO?> GetPromotionDetailByIdAsync(string id);
         Task<Promotion> CreatePromotionAsync(Promotion promotion, string userId);
         Task<Promotion> UpdatePromotionAsync(string id, Promotion promotion, string userId);
         Task<bool> DeletePromotionAsync(string id);
+        Task<bool> DeactivatePromotionAsync(string id, string userId);
+        Task<bool> ActivatePromotionAsync(string id, string userId);
         Task<List<Promotion>> GetActivePromotionsAsync();
         Task<bool> IsPromotionValidAsync(string code, decimal orderAmount);
         Task<bool> UsePromotionAsync(string id);
@@ -27,9 +31,15 @@ namespace Quanlicuahang.Services
             _promotionRepository = promotionRepository;
         }
 
+
         public async Task<List<Promotion>> GetAllPromotionsAsync()
         {
             return await _promotionRepository.GetAllPromotionsAsync();
+        }
+
+        public async Task<PromotionDetailDTO?> GetPromotionDetailByIdAsync(string id)
+        {
+            return await _promotionRepository.GetPromotionDetailByIdAsync(id);
         }
 
         public async Task<Promotion?> GetPromotionByIdAsync(string id)
@@ -63,7 +73,7 @@ namespace Quanlicuahang.Services
             ValidatePromotion(promotion);
             if(userId == null)
                 throw new ValidationException("User ID is required to create a promotion");
-
+            promotion.Id = Guid.NewGuid().ToString();
             promotion.CreatedBy = userId;
             promotion.UpdatedBy = userId;
 
@@ -96,6 +106,44 @@ namespace Quanlicuahang.Services
         public async Task<bool> DeletePromotionAsync(string id)
         {
             return await _promotionRepository.DeletePromotionAsync(id);
+        }
+
+        public async Task<bool> DeactivatePromotionAsync(string id, string userId)
+        {
+            var promotion = await _promotionRepository.GetPromotionByIdAsync(id)
+                ?? throw new KeyNotFoundException($"Promotion with ID {id} not found");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ValidationException("User ID is required to deactivate a promotion");
+
+            if (promotion.Status.Equals("inactive", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            promotion.Status = "inactive";
+            promotion.UpdatedBy = userId;
+            promotion.UpdatedAt = DateTime.UtcNow;
+
+            await _promotionRepository.UpdatePromotionAsync(promotion);
+            return true;
+        }
+
+        public async Task<bool> ActivatePromotionAsync(string id, string userId)
+        {
+            var promotion = await _promotionRepository.GetPromotionByIdAsync(id)
+                ?? throw new KeyNotFoundException($"Promotion with ID {id} not found");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ValidationException("User ID is required to activate a promotion");
+
+            if (promotion.Status.Equals("active", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            promotion.Status = "active";
+            promotion.UpdatedBy = userId;
+            promotion.UpdatedAt = DateTime.UtcNow;
+
+            await _promotionRepository.UpdatePromotionAsync(promotion);
+            return true;
         }
 
         public async Task<List<Promotion>> GetActivePromotionsAsync()
