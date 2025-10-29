@@ -1,3 +1,4 @@
+using Quanlicuahang.DTOs.Order;
 using Quanlicuahang.Models;
 using Quanlicuahang.Repositories;
 using System.ComponentModel.DataAnnotations;
@@ -14,6 +15,7 @@ namespace Quanlicuahang.Services
         Task<List<Promotion>> GetActivePromotionsAsync();
         Task<bool> IsPromotionValidAsync(string code, decimal orderAmount);
         Task<bool> UsePromotionAsync(string id);
+        Task<List<Promotion>> GetApplicablePromotionsAsync(OrderDto order);
     }
 
     public class PromotionService : IPromotionService
@@ -34,10 +36,33 @@ namespace Quanlicuahang.Services
         {
             return await _promotionRepository.GetPromotionByIdAsync(id);
         }
+        public async Task<List<Promotion>> GetApplicablePromotionsAsync(OrderDto order){
+
+            if (order == null)
+                throw new ArgumentNullException(nameof(order));
+
+            var promotions = await _promotionRepository.GetAllPromotionsAsync();
+            var now = DateTime.UtcNow;
+
+            var applicablePromotions = promotions
+                .Where(p =>
+                    p.Status.Equals("active", StringComparison.OrdinalIgnoreCase) &&
+                    p.StartDate <= now &&
+                    p.EndDate >= now &&
+                    (p.UsedCount < p.UsageLimit) &&
+                    order.TotalAmount >= p.MinOrderAmount
+                )
+                .ToList();
+
+            return applicablePromotions;
+        }
+
 
         public async Task<Promotion> CreatePromotionAsync(Promotion promotion, string userId)
         {
             ValidatePromotion(promotion);
+            if(userId == null)
+                throw new ValidationException("User ID is required to create a promotion");
 
             promotion.CreatedBy = userId;
             promotion.UpdatedBy = userId;

@@ -70,7 +70,7 @@ namespace Quanlicuahang.Repositories
                 .Where(p => p.StartDate <= currentDate && 
                            p.EndDate >= currentDate && 
                            p.Status == "active" &&
-                           (p.UsageLimit == 0 || p.UsedCount < p.UsageLimit))
+                           (p.UsedCount < p.UsageLimit))
                 .ToListAsync();
         }
     }
