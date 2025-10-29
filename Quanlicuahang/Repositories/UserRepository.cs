@@ -54,5 +54,11 @@ namespace Quanlicuahang.Repositories
                 }
             }
         }
+
+        public User? GetById(string id)
+        {
+            return _dbSet
+                .FirstOrDefault(u => u.Id == id && !u.IsDeleted);
+        }
     }
 }
