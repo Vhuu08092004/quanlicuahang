@@ -157,5 +157,12 @@ namespace Quanlicuahang.Controllers
                 return NotFound(ex.Message);
             }
         }
+
+        [HttpGet("applicable")]
+        public async Task<ActionResult<List<Promotion>>> GetApplicablePromotions([FromQuery] decimal orderAmount)
+        {
+            var promotions = await _promotionService.GetApplicablePromotionsAsync(orderAmount);
+            return Ok(promotions);
+        }
     }
 }
