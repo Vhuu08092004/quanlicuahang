@@ -20,7 +20,7 @@ namespace Quanlicuahang.Services
         Task<List<Promotion>> GetActivePromotionsAsync();
         Task<bool> IsPromotionValidAsync(string code, decimal orderAmount);
         Task<bool> UsePromotionAsync(string id);
-        Task<List<Promotion>> GetApplicablePromotionsAsync(OrderDto order);
+        Task<List<Promotion>> GetApplicablePromotionsAsync(decimal orderAmount);
     }
 
     public class PromotionService : IPromotionService
@@ -187,11 +187,8 @@ namespace Quanlicuahang.Services
         {
             return await _promotionRepository.GetPromotionByIdAsync(id);
         }
-        public async Task<List<Promotion>> GetApplicablePromotionsAsync(OrderDto order){
-
-            if (order == null)
-                throw new ArgumentNullException(nameof(order));
-
+        public async Task<List<Promotion>> GetApplicablePromotionsAsync(decimal orderAmount)
+        {
             var promotions = await _promotionRepository.GetPromotionsQuery(false)
                 .Include(p => p.Orders)
                 .ToListAsync();
@@ -203,7 +200,7 @@ namespace Quanlicuahang.Services
                     p.StartDate <= now &&
                     p.EndDate >= now &&
                     (p.UsedCount < p.UsageLimit) &&
-                    order.TotalAmount >= p.MinOrderAmount
+                    orderAmount >= p.MinOrderAmount
                 )
                 .ToList();
 
