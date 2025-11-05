@@ -159,7 +159,7 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("applicable")]
-        public async Task<ActionResult<List<Promotion>>> GetApplicablePromotions([FromQuery] decimal orderAmount)
+        public async Task<ActionResult<List<Quanlicuahang.DTOs.Promotion.PromotionListDto>>> GetApplicablePromotions([FromQuery] decimal orderAmount)
         {
             var promotions = await _promotionService.GetApplicablePromotionsAsync(orderAmount);
             return Ok(promotions);

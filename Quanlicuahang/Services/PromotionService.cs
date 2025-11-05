@@ -20,7 +20,7 @@ namespace Quanlicuahang.Services
         Task<List<Promotion>> GetActivePromotionsAsync();
         Task<bool> IsPromotionValidAsync(string code, decimal orderAmount);
         Task<bool> UsePromotionAsync(string id);
-        Task<List<Promotion>> GetApplicablePromotionsAsync(decimal orderAmount);
+        Task<List<Quanlicuahang.DTOs.Promotion.PromotionListDto>> GetApplicablePromotionsAsync(decimal orderAmount);
     }
 
     public class PromotionService : IPromotionService
@@ -187,24 +187,49 @@ namespace Quanlicuahang.Services
         {
             return await _promotionRepository.GetPromotionByIdAsync(id);
         }
-        public async Task<List<Promotion>> GetApplicablePromotionsAsync(decimal orderAmount)
+        public async Task<List<Quanlicuahang.DTOs.Promotion.PromotionListDto>> GetApplicablePromotionsAsync(decimal orderAmount)
         {
-            var promotions = await _promotionRepository.GetPromotionsQuery(false)
-                .Include(p => p.Orders)
-                .ToListAsync();
+            var query = _promotionRepository.GetPromotionsQuery(false)
+                .Include(p => p.Orders);
+
             var now = DateTime.UtcNow;
 
-            var applicablePromotions = promotions
+            var filtered = query
                 .Where(p =>
-                    p.Status.Equals("active", StringComparison.OrdinalIgnoreCase) &&
+                    p.Status.ToLower() == "active" &&
                     p.StartDate <= now &&
                     p.EndDate >= now &&
                     (p.UsedCount < p.UsageLimit) &&
                     orderAmount >= p.MinOrderAmount
                 )
-                .ToList();
+                .OrderByDescending(p => p.CreatedAt)
+                .Select(p => new Quanlicuahang.DTOs.Promotion.PromotionListDto
+                {
+                    Id = p.Id,
+                    Code = p.Code,
+                    Description = p.Description,
+                    DiscountType = p.DiscountType,
+                    DiscountValue = p.DiscountValue,
+                    StartDate = p.StartDate,
+                    EndDate = p.EndDate,
+                    MinOrderAmount = p.MinOrderAmount,
+                    UsageLimit = p.UsageLimit,
+                    UsedCount = p.UsedCount,
+                    Status = p.Status,
+                    IsDeleted = p.IsDeleted,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    CreatedBy = p.CreatedBy,
+                    UpdatedBy = p.UpdatedBy,
+                    isCanView = true,
+                    isCanCreate = true,
+                    isCanEdit = !p.IsDeleted,
+                    isCanDelete = !p.IsDeleted,
+                    isCanActive = p.IsDeleted,
+                    isCanDeActive = !p.IsDeleted
+                });
 
-            return applicablePromotions;
+            return await filtered.ToListAsync();
         }
 
 
