@@ -31,17 +31,37 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> Create([FromForm] ProductCreateUpdateDto dto)
+        public async Task<IActionResult> Create([FromBody] ProductCreateUpdateDto dto)
         {
-            var result = await _service.CreateAsync(dto);
-            return Ok(result);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _service.CreateAsync(dto);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("update/{id}")]
-        public async Task<IActionResult> Update(string id, [FromForm] ProductCreateUpdateDto dto)
+        public async Task<IActionResult> Update(string id, [FromBody] ProductCreateUpdateDto dto)
         {
-            var result = await _service.UpdateAsync(id, dto);
-            return Ok(result);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _service.UpdateAsync(id, dto);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("deactive/{id}")]
