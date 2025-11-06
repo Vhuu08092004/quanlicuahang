@@ -28,13 +28,13 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Promotion>> GetPromotionById(string id)
+        public async Task<ActionResult<Quanlicuahang.DTOs.Promotion.PromotionListDto>> GetPromotionById(string id)
         {
             var promotion = await _promotionService.GetPromotionByIdAsync(id);
             if (promotion == null)
                 return NotFound();
 
-            return Ok(promotion);
+            return Ok(MapToListDto(promotion));
         }
 
 
@@ -49,13 +49,13 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Promotion>> CreatePromotion([FromBody] Promotion promotion)
+        public async Task<ActionResult<Quanlicuahang.DTOs.Promotion.PromotionListDto>> CreatePromotion([FromBody] Promotion promotion)
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
                 var createdPromotion = await _promotionService.CreatePromotionAsync(promotion, userId);
-                return CreatedAtAction(nameof(GetPromotionById), new { id = createdPromotion.Id }, createdPromotion);
+                return CreatedAtAction(nameof(GetPromotionById), new { id = createdPromotion.Id }, MapToListDto(createdPromotion));
             }
             catch (ValidationException ex)
             {
@@ -64,13 +64,13 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<Promotion>> UpdatePromotion(string id, [FromBody] Promotion promotion)
+        public async Task<ActionResult<Quanlicuahang.DTOs.Promotion.PromotionListDto>> UpdatePromotion(string id, [FromBody] Promotion promotion)
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
                 var updatedPromotion = await _promotionService.UpdatePromotionAsync(id, promotion, userId);
-                return Ok(updatedPromotion);
+                return Ok(MapToListDto(updatedPromotion));
             }
             catch (KeyNotFoundException ex)
             {
@@ -131,10 +131,40 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("active")]
-        public async Task<ActionResult<List<Promotion>>> GetActivePromotions()
+        public async Task<ActionResult<List<Quanlicuahang.DTOs.Promotion.PromotionListDto>>> GetActivePromotions()
         {
             var promotions = await _promotionService.GetActivePromotionsAsync();
-            return Ok(promotions);
+            var list = promotions.Select(p => MapToListDto(p)).ToList();
+            return Ok(list);
+        }
+
+        private Quanlicuahang.DTOs.Promotion.PromotionListDto MapToListDto(Models.Promotion p)
+        {
+            return new Quanlicuahang.DTOs.Promotion.PromotionListDto
+            {
+                Id = p.Id,
+                Code = p.Code,
+                Description = p.Description,
+                DiscountType = p.DiscountType,
+                DiscountValue = p.DiscountValue,
+                StartDate = p.StartDate,
+                EndDate = p.EndDate,
+                MinOrderAmount = p.MinOrderAmount,
+                UsageLimit = p.UsageLimit,
+                UsedCount = p.UsedCount,
+                Status = p.Status,
+                IsDeleted = p.IsDeleted,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                CreatedBy = p.CreatedBy,
+                UpdatedBy = p.UpdatedBy,
+                isCanView = true,
+                isCanCreate = true,
+                isCanEdit = !p.IsDeleted,
+                isCanDelete = !p.IsDeleted,
+                isCanActive = p.IsDeleted,
+                isCanDeActive = !p.IsDeleted
+            };
         }
 
         [HttpGet("validate")]
