@@ -60,6 +60,8 @@ namespace Quanlicuahang.Exception
             /* ORDER & PAYMENT */
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<IInventoryRepository, InventoryRepository>();
+            services.AddScoped<IStockEntryRepository, StockEntryRepository>();
+            services.AddScoped<IStockEntryService, StockEntryService>();
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<IPaymentRepository, PaymentRepository>();
             services.AddScoped<IPaymentService, PaymentService>();
