@@ -4,6 +4,10 @@ using Microsoft.IdentityModel.Tokens;
 using Quanlicuahang.Data;
 using Quanlicuahang.Exception;
 using System.Text;
+using Quanlicuahang.Services;
+using Quanlicuahang.Repositories;
+using Quanlicuahang.Helpers;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,7 +76,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ---------------------- APP SERVICES ----------------------
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddApplicationServices();
+
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+builder.Services.AddScoped<IActionLogService, ActionLogService>();
+builder.Services.AddScoped<ITokenHelper, TokenHelper>();
+
 builder.Services.AddControllers();
+
 
 // ---------------------- SWAGGER ----------------------
 builder.Services.AddEndpointsApiExplorer();
