@@ -169,8 +169,24 @@ namespace Quanlicuahang.Services
 
         public async Task<ProductDto> CreateAsync(ProductCreateUpdateDto dto)
         {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(dto.Code))
+                throw new System.Exception("Mã sản phẩm không được để trống!");
+
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                throw new System.Exception("Tên sản phẩm không được để trống!");
+
+            if (dto.Price < 0)
+                throw new System.Exception("Giá sản phẩm phải lớn hơn hoặc bằng 0!");
+
+            if (string.IsNullOrWhiteSpace(dto.Unit))
+                throw new System.Exception("Đơn vị tính không được để trống!");
+
             if (await _repo.ExistsAsync(p => p.Code == dto.Code))
                 throw new System.Exception($"Mã sản phẩm '{dto.Code}' đã tồn tại!");
+
+            if (await _repo.ExistsAsync(p => p.Barcode == dto.Barcode))
+                throw new System.Exception($"Barcode sản phẩm '{dto.Barcode}' đã tồn tại!");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
@@ -182,13 +198,13 @@ namespace Quanlicuahang.Services
             var product = new Product
             {
                 Id = Guid.NewGuid().ToString(),
-                Code = dto.Code,
-                Name = dto.Name,
-                Barcode = dto.Barcode,
+                Code = dto.Code.Trim(),
+                Name = dto.Name.Trim(),
+                Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim(),
                 Price = dto.Price,
-                Unit = dto.Unit,
-                CategoryId = dto.CategoryId,
-                SupplierId = dto.SupplierId,
+                Unit = dto.Unit.Trim(),
+                CategoryId = string.IsNullOrWhiteSpace(dto.CategoryId) ? null : dto.CategoryId,
+                SupplierId = string.IsNullOrWhiteSpace(dto.SupplierId) ? null : dto.SupplierId,
                 CreatedBy = userId,
                 UpdatedBy = userId,
                 CreatedAt = DateTime.UtcNow,
@@ -258,6 +274,19 @@ namespace Quanlicuahang.Services
             var product = await _repo.GetByIdAsync(id);
             if (product == null) throw new System.Exception("Sản phẩm không tồn tại!");
 
+            // Validate input
+            if (string.IsNullOrWhiteSpace(dto.Code))
+                throw new System.Exception("Mã sản phẩm không được để trống!");
+
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                throw new System.Exception("Tên sản phẩm không được để trống!");
+
+            if (dto.Price < 0)
+                throw new System.Exception("Giá sản phẩm phải lớn hơn hoặc bằng 0!");
+
+            if (string.IsNullOrWhiteSpace(dto.Unit))
+                throw new System.Exception("Đơn vị tính không được để trống!");
+
             if (product.Code != dto.Code && await _repo.ExistsAsync(p => p.Code == dto.Code && !p.IsDeleted, id))
                 throw new System.Exception($"Mã sản phẩm '{dto.Code}' đã tồn tại!");
 
@@ -281,13 +310,13 @@ namespace Quanlicuahang.Services
 
           
 
-            product.Code = dto.Code;
-            product.Name = dto.Name;
-            product.Barcode = dto.Barcode;
+            product.Code = dto.Code.Trim();
+            product.Name = dto.Name.Trim();
+            product.Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim();
             product.Price = dto.Price;
-            product.Unit = dto.Unit;
-            product.CategoryId = dto.CategoryId;
-            product.SupplierId = dto.SupplierId;
+            product.Unit = dto.Unit.Trim();
+            product.CategoryId = string.IsNullOrWhiteSpace(dto.CategoryId) ? null : dto.CategoryId;
+            product.SupplierId = string.IsNullOrWhiteSpace(dto.SupplierId) ? null : dto.SupplierId;
             product.UpdatedBy = userId;
             product.UpdatedAt = DateTime.UtcNow;
 

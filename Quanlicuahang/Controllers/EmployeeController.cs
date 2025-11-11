@@ -1,22 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
-using Quanlicuahang.DTOs.Order;
+using Quanlicuahang.DTOs.Employee;
 using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
 {
-    [Route("api/order")]
+    [Route("api/employee")]
     [ApiController]
-    public class OrderController : ControllerBase
+    public class EmployeeController : ControllerBase
     {
-        private readonly IOrderService _service;
+        private readonly IEmployeeService _service;
 
-        public OrderController(IOrderService service)
+        public EmployeeController(IEmployeeService service)
         {
             _service = service;
         }
 
         [HttpPost("pagination")]
-        public async Task<IActionResult> GetAll([FromBody] OrderSearchDto searchDto)
+        public async Task<IActionResult> GetAllEmployees([FromBody] EmployeeSearchDto searchDto)
         {
             try
             {
@@ -30,12 +30,14 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("find_by_id/{id}")]
-        public async Task<IActionResult> GetById([FromRoute] string id)
+        public async Task<IActionResult> GetById(string id)
         {
             try
             {
                 var result = await _service.GetByIdAsync(id);
-                if (result == null) return NotFound("Không tìm thấy đơn hàng");
+                if (result == null)
+                    return NotFound("Nhân viên không tồn tại");
+
                 return Ok(result);
             }
             catch (System.Exception ex)
@@ -45,10 +47,11 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> Create([FromBody] OrderCreateDto dto)
+        public async Task<IActionResult> Create([FromBody] EmployeeCreateUpdateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
             try
             {
                 var result = await _service.CreateAsync(dto);
@@ -61,7 +64,7 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPut("update/{id}")]
-        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] OrderUpdateDto dto)
+        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] EmployeeCreateUpdateDto dto)
         {
             try
             {
@@ -80,8 +83,10 @@ namespace Quanlicuahang.Controllers
             try
             {
                 var result = await _service.DeActiveAsync(id);
-                if (!result) return NotFound("Đơn hàng không tồn tại");
-                return Ok("Vô hiệu hóa đơn hàng thành công");
+                if (!result)
+                    return NotFound("Nhân viên không tồn tại");
+
+                return Ok("Ngưng hoạt động nhân viên thành công");
             }
             catch (System.Exception ex)
             {
@@ -95,8 +100,10 @@ namespace Quanlicuahang.Controllers
             try
             {
                 var result = await _service.ActiveAsync(id);
-                if (!result) return NotFound("Đơn hàng không tồn tại");
-                return Ok("Kích hoạt đơn hàng thành công");
+                if (!result)
+                    return NotFound("Nhân viên không tồn tại");
+
+                return Ok("Kích hoạt nhân viên thành công");
             }
             catch (System.Exception ex)
             {
@@ -104,12 +111,12 @@ namespace Quanlicuahang.Controllers
             }
         }
 
-        [HttpGet("customer/{customerId}/history")]
-        public async Task<IActionResult> GetPurchaseHistory([FromRoute] string customerId)
+        [HttpGet("select_box")]
+        public async Task<IActionResult> GetSelectBox()
         {
             try
             {
-                var result = await _service.GetPurchaseHistoryByCustomerAsync(customerId);
+                var result = await _service.GetSelectBoxAsync();
                 return Ok(result);
             }
             catch (System.Exception ex)

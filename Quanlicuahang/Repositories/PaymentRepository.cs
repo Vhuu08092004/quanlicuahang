@@ -8,6 +8,7 @@ namespace Quanlicuahang.Repositories
     {
         Task<decimal> GetTotalPaidByOrderAsync(string orderId);
         Task<object> GetCashflowAsync(DateTime? fromDate, DateTime? toDate, int skip, int take);
+        Task<decimal> GetTotalPaidByOrderExcludingAsync(string orderId, string excludePaymentId);
     }
 
     public class PaymentRepository : BaseRepository<Payment>, IPaymentRepository
@@ -18,6 +19,14 @@ namespace Quanlicuahang.Repositories
         {
             var total = await _dbSet
                 .Where(p => !p.IsDeleted && p.OrderId == orderId)
+                .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+            return total;
+        }
+
+        public async Task<decimal> GetTotalPaidByOrderExcludingAsync(string orderId, string excludePaymentId)
+        {
+            var total = await _dbSet
+                .Where(p => !p.IsDeleted && p.OrderId == orderId && p.Id != excludePaymentId)
                 .SumAsync(p => (decimal?)p.Amount) ?? 0m;
             return total;
         }

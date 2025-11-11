@@ -1,22 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
-using Quanlicuahang.DTOs.Order;
+using Quanlicuahang.DTOs.StockEntry;
 using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
 {
-    [Route("api/order")]
+    [Route("api/stock-entry")]
     [ApiController]
-    public class OrderController : ControllerBase
+    public class StockEntryController : ControllerBase
     {
-        private readonly IOrderService _service;
+        private readonly IStockEntryService _service;
 
-        public OrderController(IOrderService service)
+        public StockEntryController(IStockEntryService service)
         {
             _service = service;
         }
 
         [HttpPost("pagination")]
-        public async Task<IActionResult> GetAll([FromBody] OrderSearchDto searchDto)
+        public async Task<IActionResult> GetAll([FromBody] StockEntrySearchDto searchDto)
         {
             try
             {
@@ -35,7 +35,7 @@ namespace Quanlicuahang.Controllers
             try
             {
                 var result = await _service.GetByIdAsync(id);
-                if (result == null) return NotFound("Không tìm thấy đơn hàng");
+                if (result == null) return NotFound("Không tìm thấy phiếu nhập");
                 return Ok(result);
             }
             catch (System.Exception ex)
@@ -45,7 +45,7 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPost("create")]
-        public async Task<IActionResult> Create([FromBody] OrderCreateDto dto)
+        public async Task<IActionResult> Create([FromBody] StockEntryCreateDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
@@ -61,7 +61,7 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPut("update/{id}")]
-        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] OrderUpdateDto dto)
+        public async Task<IActionResult> Update([FromRoute] string id, [FromBody] StockEntryUpdateDto dto)
         {
             try
             {
@@ -80,8 +80,8 @@ namespace Quanlicuahang.Controllers
             try
             {
                 var result = await _service.DeActiveAsync(id);
-                if (!result) return NotFound("Đơn hàng không tồn tại");
-                return Ok("Vô hiệu hóa đơn hàng thành công");
+                if (!result) return NotFound("Phiếu nhập không tồn tại");
+                return Ok("Vô hiệu hóa phiếu nhập thành công");
             }
             catch (System.Exception ex)
             {
@@ -95,22 +95,8 @@ namespace Quanlicuahang.Controllers
             try
             {
                 var result = await _service.ActiveAsync(id);
-                if (!result) return NotFound("Đơn hàng không tồn tại");
-                return Ok("Kích hoạt đơn hàng thành công");
-            }
-            catch (System.Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
-        }
-
-        [HttpGet("customer/{customerId}/history")]
-        public async Task<IActionResult> GetPurchaseHistory([FromRoute] string customerId)
-        {
-            try
-            {
-                var result = await _service.GetPurchaseHistoryByCustomerAsync(customerId);
-                return Ok(result);
+                if (!result) return NotFound("Phiếu nhập không tồn tại");
+                return Ok("Kích hoạt phiếu nhập thành công");
             }
             catch (System.Exception ex)
             {

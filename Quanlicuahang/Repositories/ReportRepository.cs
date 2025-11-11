@@ -217,11 +217,11 @@ namespace Quanlicuahang.Repositories
                 join p in _context.Payments on o.Id equals p.OrderId into paymentGroup
                 from p in paymentGroup.DefaultIfEmpty()
 
-                group new { o, p } by new { e.Id, e.FullName } into g
+                group new { o, p } by new { e.Id, e.Name } into g
                 select new
                 {
                     EmployeeId = g.Key.Id,
-                    EmployeeName = g.Key.FullName,
+                    EmployeeName = g.Key.Name,
 
                     TotalPayment = g
                         .Where(x =>
@@ -270,11 +270,11 @@ namespace Quanlicuahang.Repositories
                 join r in _context.Returns on o.Id equals r.OrderId into returnGroup
                 from r in returnGroup.DefaultIfEmpty()
 
-                group new { o, r } by new { e.Id, e.FullName } into g
+                group new { o, r } by new { e.Id, e.Name } into g
                 select new
                 {
                     EmployeeId = g.Key.Id,
-                    EmployeeName = g.Key.FullName,
+                    EmployeeName = g.Key.Name,
                     TotalRefund = g
                         .Where(x =>
                             x.o != null &&
