@@ -29,10 +29,10 @@ namespace Quanlicuahang.Models
         [Column(TypeName = "decimal(10,2)")]
         public decimal Subtotal { get; set; }
 
-        public DateTime? ExpiryDate { get; set; }
+        public string? WarehouseAreaId { get; set; }
 
-        [MaxLength(50)]
-        public string? BatchNumber { get; set; }
+        [ForeignKey("WarehouseAreaId")]
+        public virtual WarehouseArea? WarehouseArea { get; set; }
     }
 
 }

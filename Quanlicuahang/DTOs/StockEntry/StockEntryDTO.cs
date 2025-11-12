@@ -36,9 +36,7 @@ namespace Quanlicuahang.DTOs.StockEntry
         public int Quantity { get; set; }
         [Range(0, double.MaxValue)]
         public decimal UnitCost { get; set; }
-        public DateTime? ExpiryDate { get; set; }
-        [MaxLength(50)]
-        public string? BatchNumber { get; set; }
+        public string? WarehouseAreaId { get; set; }
     }
 
     public class StockEntryCreateDto
@@ -64,8 +62,8 @@ namespace Quanlicuahang.DTOs.StockEntry
         public string? ProductName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitCost { get; set; }
-        public DateTime? ExpiryDate { get; set; }
-        public string? BatchNumber { get; set; }
+        public string? WarehouseAreaId { get; set; }
+        public string? WarehouseAreaName { get; set; }
     }
 
     public class StockEntryWhereDto

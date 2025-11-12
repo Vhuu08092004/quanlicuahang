@@ -34,6 +34,9 @@ namespace Quanlicuahang.Data
         public DbSet<StockExitItem> StockExitItems { get; set; }
         public DbSet<Return> Returns { get; set; }
         public DbSet<ReturnItem> ReturnItems { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
+        public DbSet<WarehouseArea> WarehouseAreas { get; set; }
+        public DbSet<AreaInventory> AreaInventories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -144,6 +147,13 @@ namespace Quanlicuahang.Data
                 .HasForeignKey(sei => sei.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<StockEntryItem>()
+                .HasOne(sei => sei.WarehouseArea)
+                .WithMany()
+                .HasForeignKey(sei => sei.WarehouseAreaId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
             modelBuilder.Entity<StockExit>()
                 .HasOne(se => se.User)
                 .WithMany(u => u.StockExits)
@@ -186,6 +196,25 @@ namespace Quanlicuahang.Data
                 .HasForeignKey(ri => ri.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<WarehouseArea>()
+                .HasOne(wa => wa.Warehouse)
+                .WithMany(w => w.Areas)
+                .HasForeignKey(wa => wa.WarehouseId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
+            modelBuilder.Entity<AreaInventory>()
+                .HasOne(ai => ai.WarehouseArea)
+                .WithMany(wa => wa.AreaInventories)
+                .HasForeignKey(ai => ai.WarehouseAreaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AreaInventory>()
+                .HasOne(ai => ai.Product)
+                .WithMany()
+                .HasForeignKey(ai => ai.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<ActionLog>()
                 .HasOne(al => al.User)
                 .WithMany(u => u.ActionLogs)
@@ -211,6 +240,14 @@ namespace Quanlicuahang.Data
 
             modelBuilder.Entity<Order>()
                 .HasIndex(o => o.Code)
+                .IsUnique();
+
+            modelBuilder.Entity<Warehouse>()
+                .HasIndex(w => w.Code)
+                .IsUnique();
+
+            modelBuilder.Entity<WarehouseArea>()
+                .HasIndex(wa => wa.Code)
                 .IsUnique();
 
             var adminRoleId = GenerateCode("ROLE");
