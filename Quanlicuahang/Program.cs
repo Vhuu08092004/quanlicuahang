@@ -72,6 +72,10 @@ builder.Services.AddHttpContextAccessor();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+// ---------------------- EMAIL SERVICE CONFIG ----------------------
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddTransient<IEmailService, EmailService>();
+
 
 // ---------------------- APP SERVICES ----------------------
 builder.Services.AddAutoMapper(typeof(Program));

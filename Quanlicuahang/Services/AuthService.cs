@@ -17,6 +17,7 @@ namespace Quanlicuahang.Services
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
         public AuthService(
             IAuthRepository authRepository,
@@ -24,7 +25,8 @@ namespace Quanlicuahang.Services
             IUserTokenRepository userTokenRepository,
             IActionLogService logService,
             IHttpContextAccessor httpContextAccessor,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEmailService emailService)
         {
             _authRepository = authRepository;
             _userRepository = userRepository;
@@ -32,6 +34,7 @@ namespace Quanlicuahang.Services
             _logService = logService;
             _httpContextAccessor = httpContextAccessor;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         private string HashPassword(string password)
@@ -59,7 +62,7 @@ namespace Quanlicuahang.Services
                         description: $"Login thất bại - User '{request.Username}' không tồn tại",
                         oldValue: null,
                         newValue: null,
-                        userId: "Admin",  
+                        userId: "Admin",
                         ip: ip,
                         userAgent: agent
                     );
@@ -76,7 +79,7 @@ namespace Quanlicuahang.Services
                         description: $"Login thất bại - User '{user.Username}' đã bị vô hiệu hóa",
                         oldValue: null,
                         newValue: null,
-                        userId: user.Id, 
+                        userId: user.Id,
                         ip: ip,
                         userAgent: agent
                     );
@@ -126,7 +129,7 @@ namespace Quanlicuahang.Services
                     description: $"Login thành công - User '{user.Username}'",
                     oldValue: null,
                     newValue: new { user.Id, user.Username, loginTime = DateTime.UtcNow },
-                    userId: userIdFromToken ?? user.Id, 
+                    userId: userIdFromToken ?? user.Id,
                     ip: ip,
                     userAgent: agent
                 );
@@ -156,6 +159,253 @@ namespace Quanlicuahang.Services
                     entityType: "Auth",
                     entityId: request.Username,
                     description: $"Login exception - {ex.Message}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: "SYSTEM",
+                    ip: ip,
+                    userAgent: agent
+                );
+                throw;
+            }
+        }
+        public async Task<bool?> RegisterAsync(RegisterRequest request)
+        {
+            var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            try
+            {
+                // 1. Validate cơ bản
+                if (string.IsNullOrWhiteSpace(request.Username) ||
+                    string.IsNullOrWhiteSpace(request.Email) ||
+                    string.IsNullOrWhiteSpace(request.Password) ||
+                    string.IsNullOrWhiteSpace(request.ConfirmPassword))
+                {
+                    return false;
+                }
+
+                if (request.Password != request.ConfirmPassword)
+                {
+                    return false;
+                }
+
+                // 2. Check trùng username
+                var existedUser = await _authRepository.GetUserByUsernameAsync(request.Username);
+                if (existedUser != null)
+                {
+                    return false;
+                }
+
+                // 3. Check trùng email
+                var existedEmailUser = await _userRepository.GetByEmailAsync(request.Email);
+                if (existedEmailUser != null)
+                {
+                    return false;
+                }
+
+                // 4. Hash password
+                var hashedPassword = HashPassword(request.Password);
+
+                // 5. Tạo user mới
+                var newUser = new User
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Username = request.Username,
+                    Email = request.Email,
+                    FullName = request.FullName,
+                    Password = hashedPassword,
+                    CreatedAt = DateTime.UtcNow,
+                    IsDeleted = false
+                };
+
+                await _userRepository.AddAsync(newUser);
+
+                // 6. Log hoạt động đăng ký
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "Register",
+                    entityType: "Auth",
+                    entityId: newUser.Id,
+                    description: $"User '{newUser.Username}' đăng ký tài khoản thành công",
+                    oldValue: null,
+                    newValue: newUser,
+                    userId: newUser.Id,
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "RegisterException",
+                    entityType: "Auth",
+                    entityId: request.Username,
+                    description: $"Register exception - {ex.Message}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: "SYSTEM",
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                throw;
+            }
+        }
+
+        public async Task<bool> SendResetPasswordOtpAsync(ForgotPasswordRequest request)
+        {
+            var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email))
+                {
+                    return false;
+                }
+
+                var user = await _userRepository.GetByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    await _logService.LogAsync(
+                        code: Guid.NewGuid().ToString(),
+                        action: "ForgotPassword",
+                        entityType: "Auth",
+                        entityId: request.Email,
+                        description: $"Yêu cầu quên mật khẩu với email không tồn tại: {request.Email}",
+                        oldValue: null,
+                        newValue: null,
+                        userId: "SYSTEM",
+                        ip: ip,
+                        userAgent: agent
+                    );
+
+                    // vẫn trả true để không lộ email tồn tại hay không
+                    return true;
+                }
+
+                // Tạo mã OTP 6 chữ số
+                var random = new Random();
+                var otpCode = random.Next(100000, 999999).ToString();
+
+                var token = new UserToken
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    UserId = user.Id,
+                    Token = otpCode,
+                    Expiration = DateTime.UtcNow.AddMinutes(10),
+                    CreatedAt = DateTime.UtcNow,
+                    IsRevoked = false
+                };
+
+                await _userTokenRepository.AddTokenAsync(token);
+
+                var subject = "Reset password OTP";
+                var body = $"Your OTP code is: {otpCode}\nThis code will expire in 10 minutes.";
+
+                await _emailService.SendEmailAsync(user.Email, subject, body);
+
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "SendResetPasswordOtp",
+                    entityType: "Auth",
+                    entityId: user.Id,
+                    description: $"Gửi OTP reset mật khẩu tới email {request.Email}",
+                    oldValue: null,
+                    newValue: new { Email = request.Email },
+                    userId: user.Id,
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "SendResetPasswordOtpException",
+                    entityType: "Auth",
+                    entityId: request.Email,
+                    description: $"Lỗi gửi OTP reset mật khẩu - {ex.Message}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: "SYSTEM",
+                    ip: ip,
+                    userAgent: agent
+                );
+                throw;
+            }
+        }
+
+        // ⭐ ĐẶT LẠI MẬT KHẨU BẰNG OTP
+        public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Email) ||
+                    string.IsNullOrWhiteSpace(request.OtpCode) ||
+                    string.IsNullOrWhiteSpace(request.NewPassword) ||
+                    string.IsNullOrWhiteSpace(request.ConfirmPassword))
+                {
+                    return false;
+                }
+
+                if (request.NewPassword != request.ConfirmPassword)
+                {
+                    return false;
+                }
+
+                var user = await _userRepository.GetByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    return false;
+                }
+
+                var token = await _userTokenRepository.GetTokenAsync(request.OtpCode);
+                if (token == null ||
+                    token.IsRevoked ||
+                    token.Expiration < DateTime.UtcNow ||
+                    token.UserId != user.Id)
+                {
+                    return false;
+                }
+
+                user.Password = HashPassword(request.NewPassword);
+                await _userRepository.UpdateAsync(user);
+
+                token.IsRevoked = true;
+                await _userTokenRepository.UpdateTokenAsync(token);
+
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "ResetPassword",
+                    entityType: "Auth",
+                    entityId: user.Id,
+                    description: $"User '{user.Username}' reset mật khẩu thành công bằng OTP",
+                    oldValue: null,
+                    newValue: new { user.Id, user.Username, resetTime = DateTime.UtcNow },
+                    userId: user.Id,
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "ResetPasswordException",
+                    entityType: "Auth",
+                    entityId: request.Email,
+                    description: $"Lỗi reset mật khẩu - {ex.Message}",
                     oldValue: null,
                     newValue: null,
                     userId: "SYSTEM",
