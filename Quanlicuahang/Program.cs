@@ -24,12 +24,25 @@ builder.Services.AddCors(options =>
                 "http://127.0.0.1:5173",
                 "http://localhost:5174",
                 "http://127.0.0.1:5174",
-                "http://127.0.0.1:3001"
+                "http://localhost:5000"
+
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
     });
+});
+var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins,
+                      policy =>
+                      {
+                          policy.AllowAnyOrigin()
+                                .AllowAnyHeader()
+                                .AllowAnyMethod();
+                      });
 });
 
 // ---------------------- JWT CONFIG ----------------------
@@ -110,6 +123,7 @@ else
 }
 
 app.UseCors("AllowReactApp");
+app.UseCors(MyAllowSpecificOrigins);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
