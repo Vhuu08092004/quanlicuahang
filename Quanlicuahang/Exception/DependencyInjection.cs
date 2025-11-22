@@ -48,7 +48,7 @@ namespace Quanlicuahang.Exception
 
             /* HELPERS */
             services.AddScoped<ITokenHelper, TokenHelper>();
-          
+
             /* PROMOTION */
             services.AddScoped<IPromotionRepository, PromotionRepository>();
             services.AddScoped<IPromotionService, PromotionService>();
@@ -65,6 +65,13 @@ namespace Quanlicuahang.Exception
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<IPaymentRepository, PaymentRepository>();
             services.AddScoped<IPaymentService, PaymentService>();
+
+            /* WAREHOUSE */
+            services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+            services.AddScoped<IWarehouseService, WarehouseService>();
+            services.AddScoped<IWarehouseAreaRepository, WarehouseAreaRepository>();
+            services.AddScoped<IWarehouseAreaService, WarehouseAreaService>();
+            services.AddScoped<IAreaInventoryRepository, AreaInventoryRepository>();
 
 
             return services;

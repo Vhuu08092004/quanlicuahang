@@ -21,6 +21,9 @@ namespace Quanlicuahang.Services
         private readonly IStockEntryRepository _stockEntryRepo;
         private readonly IInventoryRepository _inventoryRepo;
         private readonly IProductRepository _productRepo;
+        private readonly IAreaInventoryRepository _areaInventoryRepo;
+        private readonly IWarehouseAreaRepository _warehouseAreaRepo;
+        private readonly IUserRepository _userRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
@@ -29,6 +32,9 @@ namespace Quanlicuahang.Services
             IStockEntryRepository stockEntryRepo,
             IInventoryRepository inventoryRepo,
             IProductRepository productRepo,
+            IAreaInventoryRepository areaInventoryRepo,
+            IWarehouseAreaRepository warehouseAreaRepo,
+            IUserRepository userRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper)
@@ -36,6 +42,9 @@ namespace Quanlicuahang.Services
             _stockEntryRepo = stockEntryRepo;
             _inventoryRepo = inventoryRepo;
             _productRepo = productRepo;
+            _areaInventoryRepo = areaInventoryRepo;
+            _warehouseAreaRepo = warehouseAreaRepo;
+            _userRepo = userRepo;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -124,6 +133,8 @@ namespace Quanlicuahang.Services
                 .Include(se => se.User)
                 .Include(se => se.StockEntryItems)
                     .ThenInclude(sei => sei.Product)
+                .Include(se => se.StockEntryItems)
+                    .ThenInclude(sei => sei.WarehouseArea)
                 .Where(o => o.Id == id)
                 .Select(o => new StockEntryDto
                 {
@@ -147,8 +158,8 @@ namespace Quanlicuahang.Services
                             ProductName = i.Product != null ? i.Product.Name : null,
                             Quantity = i.Quantity,
                             UnitCost = i.UnitCost,
-                            ExpiryDate = i.ExpiryDate,
-                            BatchNumber = i.BatchNumber
+                            WarehouseAreaId = i.WarehouseAreaId,
+                            WarehouseAreaName = i.WarehouseArea != null ? i.WarehouseArea.Name : null
                         }).ToList()
                 })
                 .FirstOrDefaultAsync();
@@ -169,12 +180,27 @@ namespace Quanlicuahang.Services
                 var product = await _productRepo.GetByIdAsync(item.ProductId);
                 if (product == null || product.IsDeleted)
                     throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+
+                // Validate WarehouseAreaId nếu có
+                if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                {
+                    var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
+                    if (warehouseArea == null || warehouseArea.IsDeleted)
+                        throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
+                }
             }
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
+
+            // Kiểm tra userId có tồn tại trong database không
+            string? validUserId = null;
+            if (!string.IsNullOrEmpty(userId))
             {
-                userId = "system";
+                var user = await _userRepo.GetByIdAsync(userId);
+                if (user != null && !user.IsDeleted)
+                {
+                    validUserId = userId;
+                }
             }
 
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
@@ -191,9 +217,9 @@ namespace Quanlicuahang.Services
                 Status = "pending",
                 TotalCost = totalCost,
                 Note = dto.Note,
-                UserId = userId,
-                CreatedBy = userId,
-                UpdatedBy = userId,
+                UserId = validUserId,
+                CreatedBy = validUserId ?? "system",
+                UpdatedBy = validUserId ?? "system",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -210,14 +236,43 @@ namespace Quanlicuahang.Services
                     Quantity = item.Quantity,
                     UnitCost = item.UnitCost,
                     Subtotal = item.UnitCost * item.Quantity,
-                    ExpiryDate = item.ExpiryDate,
-                    BatchNumber = item.BatchNumber,
-                    CreatedBy = userId,
-                    UpdatedBy = userId,
+                    WarehouseAreaId = string.IsNullOrWhiteSpace(item.WarehouseAreaId) ? null : item.WarehouseAreaId,
+                    CreatedBy = validUserId ?? "system",
+                    UpdatedBy = validUserId ?? "system",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
                 entry.StockEntryItems.Add(sei);
+
+                // Cập nhật AreaInventory nếu có WarehouseAreaId
+                if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                {
+                    var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                        .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
+
+                    if (existingAreaInventory != null)
+                    {
+                        existingAreaInventory.Quantity += item.Quantity;
+                        existingAreaInventory.UpdatedBy = validUserId ?? "system";
+                        existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                        _areaInventoryRepo.Update(existingAreaInventory);
+                    }
+                    else
+                    {
+                        var newAreaInventory = new AreaInventory
+                        {
+                            Id = Guid.NewGuid().ToString(),
+                            WarehouseAreaId = item.WarehouseAreaId,
+                            ProductId = item.ProductId,
+                            Quantity = item.Quantity,
+                            CreatedBy = validUserId ?? "system",
+                            UpdatedBy = validUserId ?? "system",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        await _areaInventoryRepo.AddAsync(newAreaInventory);
+                    }
+                }
             }
 
             var grouped = dto.Items
@@ -230,7 +285,7 @@ namespace Quanlicuahang.Services
                 if (prod != null)
                 {
                     prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
-                    prod.UpdatedBy = userId;
+                    prod.UpdatedBy = validUserId ?? "system";
                     prod.UpdatedAt = DateTime.UtcNow;
                     _productRepo.Update(prod);
                 }
@@ -246,8 +301,8 @@ namespace Quanlicuahang.Services
                     Code = GenerateCode("INVIN"),
                     ProductId = item.ProductId,
                     Quantity = Math.Abs(item.Quantity),
-                    CreatedBy = userId,
-                    UpdatedBy = userId,
+                    CreatedBy = validUserId ?? "system",
+                    UpdatedBy = validUserId ?? "system",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     IsDeleted = false
@@ -271,7 +326,7 @@ namespace Quanlicuahang.Services
                     entry.TotalCost,
                     Items = dto.Items.Select(x => new { x.ProductId, x.Quantity, x.UnitCost }).ToList()
                 },
-                userId: userId,
+                userId: validUserId ?? "system",
                 ip: ip,
                 userAgent: agent
             );
@@ -338,6 +393,21 @@ namespace Quanlicuahang.Services
                             await _inventoryRepo.AddAsync(inv);
                         }
                     }
+
+                    // Trừ lại quantity từ AreaInventory khi hủy phiếu
+                    foreach (var item in entry.StockEntryItems.Where(i => !i.IsDeleted && !string.IsNullOrWhiteSpace(i.WarehouseAreaId)))
+                    {
+                        var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                            .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
+
+                        if (existingAreaInventory != null)
+                        {
+                            existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - item.Quantity);
+                            existingAreaInventory.UpdatedBy = userId;
+                            existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            _areaInventoryRepo.Update(existingAreaInventory);
+                        }
+                    }
                 }
 
                 entry.Status = to;
@@ -379,6 +449,14 @@ namespace Quanlicuahang.Services
                     var product = await _productRepo.GetByIdAsync(item.ProductId);
                     if (product == null || product.IsDeleted)
                         throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+
+                    // Validate WarehouseAreaId nếu có
+                    if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                    {
+                        var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
+                        if (warehouseArea == null || warehouseArea.IsDeleted)
+                            throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
+                    }
                 }
 
                 var oldGroups = entry.StockEntryItems
@@ -426,6 +504,21 @@ namespace Quanlicuahang.Services
                     }
                 }
 
+                // Trừ lại quantity cũ từ AreaInventory trước khi xóa các item cũ
+                foreach (var oldItem in entry.StockEntryItems.Where(x => !string.IsNullOrWhiteSpace(x.WarehouseAreaId)))
+                {
+                    var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                        .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == oldItem.WarehouseAreaId && ai.ProductId == oldItem.ProductId);
+
+                    if (existingAreaInventory != null)
+                    {
+                        existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - oldItem.Quantity);
+                        existingAreaInventory.UpdatedBy = userId;
+                        existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                        _areaInventoryRepo.Update(existingAreaInventory);
+                    }
+                }
+
                 foreach (var it in entry.StockEntryItems)
                 {
                     it.IsDeleted = true;
@@ -435,7 +528,7 @@ namespace Quanlicuahang.Services
 
                 foreach (var item in dto.Items)
                 {
-                    entry.StockEntryItems.Add(new StockEntryItem
+                    var newItem = new StockEntryItem
                     {
                         Id = Guid.NewGuid().ToString(),
                         StockEntryId = entry.Id,
@@ -443,13 +536,43 @@ namespace Quanlicuahang.Services
                         Quantity = item.Quantity,
                         UnitCost = item.UnitCost,
                         Subtotal = item.UnitCost * item.Quantity,
-                        ExpiryDate = item.ExpiryDate,
-                        BatchNumber = item.BatchNumber,
+                        WarehouseAreaId = string.IsNullOrWhiteSpace(item.WarehouseAreaId) ? null : item.WarehouseAreaId,
                         CreatedBy = userId,
                         UpdatedBy = userId,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
-                    });
+                    };
+                    entry.StockEntryItems.Add(newItem);
+
+                    // Cập nhật AreaInventory nếu có WarehouseAreaId
+                    if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                    {
+                        var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                            .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
+
+                        if (existingAreaInventory != null)
+                        {
+                            existingAreaInventory.Quantity += item.Quantity;
+                            existingAreaInventory.UpdatedBy = userId;
+                            existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            _areaInventoryRepo.Update(existingAreaInventory);
+                        }
+                        else
+                        {
+                            var newAreaInventory = new AreaInventory
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                WarehouseAreaId = item.WarehouseAreaId,
+                                ProductId = item.ProductId,
+                                Quantity = item.Quantity,
+                                CreatedBy = userId,
+                                UpdatedBy = userId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            await _areaInventoryRepo.AddAsync(newAreaInventory);
+                        }
+                    }
                 }
 
                 entry.TotalCost = dto.Items.Sum(x => x.UnitCost * x.Quantity);
