@@ -22,6 +22,7 @@ namespace Quanlicuahang.Services
         private readonly IOrderRepository _orderRepo;
         private readonly IInventoryRepository _inventoryRepo;
         private readonly IProductRepository _productRepo;
+        private readonly IUserRepository _userRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
@@ -30,6 +31,7 @@ namespace Quanlicuahang.Services
             IOrderRepository orderRepo,
             IInventoryRepository inventoryRepo,
             IProductRepository productRepo,
+            IUserRepository userRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper)
@@ -37,6 +39,7 @@ namespace Quanlicuahang.Services
             _orderRepo = orderRepo;
             _inventoryRepo = inventoryRepo;
             _productRepo = productRepo;
+            _userRepo = userRepo;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -176,10 +179,16 @@ namespace Quanlicuahang.Services
             }
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
+
+            // Kiểm tra userId có tồn tại trong database không
+            string? validUserId = null;
+            if (!string.IsNullOrEmpty(userId))
             {
-                // Allow creation without token for testing or public endpoints
-                userId = "system";
+                var user = await _userRepo.GetByIdAsync(userId);
+                if (user != null && !user.IsDeleted)
+                {
+                    validUserId = userId;
+                }
             }
 
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
@@ -194,14 +203,14 @@ namespace Quanlicuahang.Services
                 Id = Guid.NewGuid().ToString(),
                 Code = GenerateCode("ORDER"),
                 CustomerId = string.IsNullOrWhiteSpace(dto.CustomerId) ? null : dto.CustomerId,
-                UserId = userId,
+                UserId = validUserId,
                 PromoId = string.IsNullOrWhiteSpace(dto.PromotionId) ? null : dto.PromotionId,
                 OrderDate = DateTime.UtcNow,
                 Status = "pending",
                 TotalAmount = gross,
                 DiscountAmount = discount,
-                CreatedBy = userId,
-                UpdatedBy = userId,
+                CreatedBy = validUserId ?? "system",
+                UpdatedBy = validUserId ?? "system",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -219,8 +228,8 @@ namespace Quanlicuahang.Services
                     Quantity = item.Quantity,
                     Price = item.UnitPrice,
                     Subtotal = item.UnitPrice * item.Quantity,
-                    CreatedBy = userId,
-                    UpdatedBy = userId,
+                    CreatedBy = validUserId ?? "system",
+                    UpdatedBy = validUserId ?? "system",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -242,7 +251,7 @@ namespace Quanlicuahang.Services
                 if (prod != null)
                 {
                     prod.Quantity = Math.Max(0, prod.Quantity - g.Qty);
-                    prod.UpdatedBy = userId;
+                    prod.UpdatedBy = validUserId ?? "system";
                     prod.UpdatedAt = DateTime.UtcNow;
                     _productRepo.Update(prod);
                 }
@@ -260,8 +269,8 @@ namespace Quanlicuahang.Services
                     Code = GenerateCode("INVOUT"),
                     ProductId = item.ProductId,
                     Quantity = -Math.Abs(item.Quantity),
-                    CreatedBy = userId,
-                    UpdatedBy = userId,
+                    CreatedBy = validUserId ?? "system",
+                    UpdatedBy = validUserId ?? "system",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     IsDeleted = false
@@ -286,7 +295,7 @@ namespace Quanlicuahang.Services
                     order.DiscountAmount,
                     Items = dto.Items.Select(x => new { x.ProductId, x.Quantity, x.UnitPrice }).ToList()
                 },
-                userId: userId,
+                userId: validUserId ?? "system",
                 ip: ip,
                 userAgent: agent
             );

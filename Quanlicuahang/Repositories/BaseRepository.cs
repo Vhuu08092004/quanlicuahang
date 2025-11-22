@@ -66,7 +66,39 @@ public class BaseRepository<T> : IBaseRepository<T> where T : BasePrimary
 
     public virtual async Task<int> SaveChangesAsync()
     {
-        return await _context.SaveChangesAsync();
+        try
+        {
+            return await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            // Chuyển đổi thông báo lỗi Entity Framework sang tiếng Việt
+            var errorMessage = ex.InnerException?.Message ?? ex.Message;
+
+            if (errorMessage.Contains("An error occurred while saving the entity changes"))
+            {
+                throw new System.Exception("Đã xảy ra lỗi khi lưu dữ liệu. Vui lòng kiểm tra lại thông tin và thử lại.", ex);
+            }
+
+            // Xử lý các lỗi phổ biến khác
+            if (errorMessage.Contains("Cannot insert duplicate key"))
+            {
+                throw new System.Exception("Dữ liệu đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.", ex);
+            }
+
+            if (errorMessage.Contains("Foreign key constraint"))
+            {
+                throw new System.Exception("Không thể xóa dữ liệu này vì đang được sử dụng ở nơi khác.", ex);
+            }
+
+            if (errorMessage.Contains("Cannot delete or update"))
+            {
+                throw new System.Exception("Không thể xóa hoặc cập nhật dữ liệu này vì đang được sử dụng.", ex);
+            }
+
+            // Nếu không phải các lỗi đã xử lý, throw lại với thông báo gốc nhưng có thêm context
+            throw new System.Exception($"Lỗi khi lưu dữ liệu: {errorMessage}", ex);
+        }
     }
 
     public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate, string? excludeId = null)
@@ -111,7 +143,7 @@ public class BaseRepository<T> : IBaseRepository<T> where T : BasePrimary
 
         entity.IsDeleted = true;
         _dbSet.Update(entity);
-        await _context.SaveChangesAsync();
+        await SaveChangesAsync();
         return true;
     }
 
@@ -122,7 +154,7 @@ public class BaseRepository<T> : IBaseRepository<T> where T : BasePrimary
 
         entity.IsDeleted = false;
         _dbSet.Update(entity);
-        await _context.SaveChangesAsync();
+        await SaveChangesAsync();
         return true;
     }
 }
