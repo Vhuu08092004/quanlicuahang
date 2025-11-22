@@ -29,6 +29,51 @@ namespace Quanlicuahang.Controllers
             return Ok(result);
         }
 
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        {
+            var result = await _authService.RegisterAsync(request);
+
+            if (result == null)
+            {
+                return BadRequest(new
+                {
+                    message = "Đăng ký thất bại. Username hoặc Email đã tồn tại, hoặc dữ liệu không hợp lệ."
+                });
+            }
+
+            return Ok(result);
+        }
+
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var ok = await _authService.SendResetPasswordOtpAsync(request);
+
+            if (!ok)
+                return BadRequest(new { message = "Yêu cầu đặt lại mật khẩu không hợp lệ." });
+
+            // Không tiết lộ email có tồn tại hay không
+            return Ok(new { message = "Nếu email tồn tại, mã OTP sẽ được gửi để đặt lại mật khẩu." });
+        }
+
+
+          // ⭐ ĐẶT LẠI MẬT KHẨU BẰNG OTP
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            var ok = await _authService.ResetPasswordAsync(request);
+
+            if (!ok)
+                return BadRequest(new { message = "Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại email, OTP và mật khẩu." });
+
+            return Ok(new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại." });
+        }
+    
+
+
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] string refreshToken)
         {
