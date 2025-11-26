@@ -22,26 +22,26 @@ namespace Quanlicuahang.DTOs.Promotion
 
     public class PromotionDetailDTO
     {
-        public string Id { get; set; }
-        public string Code { get; set; }
-        public string Description { get; set; }
-        public string DiscountType { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string DiscountType { get; set; } = string.Empty;
         public decimal DiscountValue { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public decimal MinOrderAmount { get; set; }
         public int UsageLimit { get; set; }
         public int UsedCount { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public bool IsDeleted { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
-        public UserDto CreatedBy { get; set; }
-        public UserDto UpdatedBy { get; set; }
+        public UserDto CreatedBy { get; set; } = null!;
+        public UserDto UpdatedBy { get; set; } = null!;
 
-        public List<OrderDto> Orders { get; set; }
+        public List<OrderDto> Orders { get; set; } = new();
     }
 
 }

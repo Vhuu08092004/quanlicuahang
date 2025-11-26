@@ -22,7 +22,7 @@
 
     public class RevenueByEmployeeDto
     {
-        public string EmployeeName { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
         public decimal TotalRevenue { get; set; }
         public decimal TotalPayment { get; set; }
         public int OrderCount { get; set; }
@@ -30,7 +30,7 @@
 
     public class RevenueByCustomerDto
     {
-        public string CustomerName { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
         public decimal TotalRevenue { get; set; }
         public int OrderCount { get; set; }
         public float AverageOrder { get; set; }
@@ -38,14 +38,14 @@
 
     public class RevenueByCustomerGroupDto
     {
-        public string GroupName { get; set; } // Ví dụ: "Hà Nội", "TP.HCM", dựa trên Address
+        public string GroupName { get; set; } = string.Empty; // Ví dụ: "Hà Nội", "TP.HCM", dựa trên Address
         public decimal TotalRevenue { get; set; }
         public int CustomerCount { get; set; }
     }
 
     public class TopSellingProductDto
     {
-        public string ProductName { get; set; }
+        public string ProductName { get; set; } = string.Empty;
         public string? CategoryName { get; set; }
         public int TotalQuantity { get; set; }
         public decimal TotalRevenue { get; set; }
@@ -54,12 +54,12 @@
 
     public class InventoryReportDto
     {
-        public string ProductName { get; set; }
-        public string CategoryName { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string CategoryName { get; set; } = string.Empty;
         public int Quantity { get; set; } // Số lượng tồn kho
         public int SoldQuantity { get; set; } // Số lượng đã bán
         public decimal UnitPrice { get; set; } // Đơn giá
         public decimal InventoryValue { get; set; } // Giá trị tồn kho (Quantity * UnitPrice)
-        public string Status { get; set; } // "InStock", "LowStock", "OutOfStock"
+        public string Status { get; set; } = string.Empty; // "InStock", "LowStock", "OutOfStock"
     }
 }
