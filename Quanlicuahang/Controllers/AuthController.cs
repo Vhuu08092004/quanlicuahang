@@ -54,12 +54,10 @@ namespace Quanlicuahang.Controllers
             if (!ok)
                 return BadRequest(new { message = "Yêu cầu đặt lại mật khẩu không hợp lệ." });
 
-            // Không tiết lộ email có tồn tại hay không
             return Ok(new { message = "Nếu email tồn tại, mã OTP sẽ được gửi để đặt lại mật khẩu." });
         }
 
 
-          // ⭐ ĐẶT LẠI MẬT KHẨU BẰNG OTP
         [HttpPost("reset-password")]
         [AllowAnonymous]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)

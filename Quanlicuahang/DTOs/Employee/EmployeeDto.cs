@@ -4,7 +4,7 @@ namespace Quanlicuahang.DTOs.Employee
 {
     public class EmployeeDto : BaseDto
     {
-        public string Code { get; set; } = string.Empty; // ✅ Mã nhân viên
+        public string Code { get; set; } = string.Empty; 
         public string Name { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
@@ -21,7 +21,7 @@ namespace Quanlicuahang.DTOs.Employee
 
     public class EmployeeWhereDto
     {
-        public string? Code { get; set; } // ✅ Tìm theo mã nhân viên
+        public string? Code { get; set; } 
         public string? Name { get; set; }
         public string? Phone { get; set; }
         public string? Email { get; set; }
@@ -30,7 +30,7 @@ namespace Quanlicuahang.DTOs.Employee
 
     public class EmployeeCreateUpdateDto
     {
-        public string Code { get; set; } = string.Empty; // ✅ Mã nhân viên (có thể nhập hoặc tự sinh)
+        public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
