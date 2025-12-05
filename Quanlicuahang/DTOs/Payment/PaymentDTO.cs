@@ -8,7 +8,8 @@ namespace Quanlicuahang.DTOs.Payment
         public string? OrderCode { get; set; }
         public string? CustomerName { get; set; }
         public decimal Amount { get; set; }
-        public string PaymentMethod { get; set; } = "cash"; // cash | transfer
+        public string PaymentMethod { get; set; } = Enum.PaymentMethod.Cash.ToString();
+        public string PaymentStatus { get; set; } = Enum.PaymentStatus.Pending.ToString();
         public DateTime PaymentDate { get; set; }
         public string? OrderStatus { get; set; }
         public string? OperatorName { get; set; }
@@ -17,10 +18,10 @@ namespace Quanlicuahang.DTOs.Payment
 
     public class PaymentCreateDto
     {
-        public string OrderId { get; set; } = string.Empty;
+        public string? OrderId { get; set; }
         public string? OrderCode { get; set; }
         public decimal Amount { get; set; }
-        public string PaymentMethod { get; set; } = "cash"; // cash | transfer
+        public string PaymentMethod { get; set; } = Enum.PaymentMethod.Cash.ToString();
         public DateTime? PaymentDate { get; set; }
         public string? Note { get; set; }
     }
@@ -33,7 +34,8 @@ namespace Quanlicuahang.DTOs.Payment
     public class PaymentSearchWhereDto
     {
         public string? OrderCode { get; set; }
-        public string? PaymentMethod { get; set; } // cash | transfer
+        public string? PaymentMethod { get; set; }
+        public string? PaymentStatus { get; set; }
         public DateTime? FromDate { get; set; }
         public DateTime? ToDate { get; set; }
         public bool? IsDeleted { get; set; }
@@ -52,12 +54,23 @@ namespace Quanlicuahang.DTOs.Payment
     public class PaymentUpdateDto
     {
         public decimal Amount { get; set; }
-        public string PaymentMethod { get; set; } = "cash";
+        public string PaymentMethod { get; set; } = Enum.PaymentMethod.Cash.ToString();
+        public string? PaymentStatus { get; set; }
         public DateTime? PaymentDate { get; set; }
         public string? Note { get; set; }
     }
 
     public class ChangeActiveDto
+    {
+        public string? Reason { get; set; }
+    }
+
+    public class PaymentCompleteDto
+    {
+        public string? Note { get; set; }
+    }
+
+    public class PaymentCancelDto
     {
         public string? Reason { get; set; }
     }

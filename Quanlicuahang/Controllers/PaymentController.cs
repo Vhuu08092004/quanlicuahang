@@ -147,5 +147,81 @@ namespace Quanlicuahang.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPost("complete/{id}")]
+        public async Task<IActionResult> CompletePayment([FromRoute] string id, [FromBody] PaymentCompleteDto? dto)
+        {
+            try
+            {
+                var result = await _service.CompletePaymentAsync(id, dto?.Note);
+                if (!result) return BadRequest("Không thể hoàn thành thanh toán");
+                
+                var payment = await _service.GetByIdAsync(id);
+                return Ok(new { message = "Hoàn thành thanh toán thành công", payment });
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("cancel/{id}")]
+        public async Task<IActionResult> CancelPayment([FromRoute] string id, [FromBody] PaymentCancelDto? dto)
+        {
+            try
+            {
+                var result = await _service.CancelPaymentAsync(id, dto?.Reason);
+                if (!result) return BadRequest("Không thể hủy thanh toán");
+                
+                var payment = await _service.GetByIdAsync(id);
+                return Ok(new { message = "Hủy thanh toán thành công", payment });
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("statuses")]
+        public async Task<IActionResult> GetStatuses()
+        {
+            try
+            {
+                var result = await _service.GetStatusesAsync();
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("pending/order/{orderId}")]
+        public async Task<IActionResult> GetPendingPaymentsByOrder([FromRoute] string orderId)
+        {
+            try
+            {
+                var result = await _service.GetPendingPaymentsByOrderAsync(orderId);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("pending/all")]
+        public async Task<IActionResult> GetAllPendingPayments()
+        {
+            try
+            {
+                var result = await _service.GetAllPendingPaymentsAsync();
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

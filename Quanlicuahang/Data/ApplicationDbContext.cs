@@ -40,14 +40,21 @@ namespace Quanlicuahang.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Cấu hình relationships
             ConfigureRelationships(modelBuilder);
-
-            // Cấu hình indexes
             ConfigureIndexes(modelBuilder);
-
-            // Seed data
             SeedData(modelBuilder);
+
+            modelBuilder
+              .Entity<Payment>()
+              .Property(p => p.PaymentMethod)
+              .HasConversion<string>();
+
+            modelBuilder
+                .Entity<Payment>()
+                .Property(p => p.PaymentStatus)
+                .HasConversion<string>();
+
+            base.OnModelCreating(modelBuilder);
         }
 
         private void ConfigureRelationships(ModelBuilder modelBuilder)

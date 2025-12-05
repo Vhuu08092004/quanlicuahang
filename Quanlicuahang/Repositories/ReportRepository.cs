@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.Data;
 using Quanlicuahang.DTOs.Report;
+using Quanlicuahang.Enum;
 
 namespace Quanlicuahang.Repositories
 {
@@ -16,7 +17,7 @@ namespace Quanlicuahang.Repositories
         Task<object> GetInventoryReportAsync(int skip, int take);
     }
 
-    // Implementation của ReportRepository, lấy thẳng từ DbContext
+  // Implementation của ReportRepository, lấy thẳng từ DbContext
     public class ReportRepository : IReportRepository
     {
         private readonly ApplicationDbContext _context; 
@@ -39,7 +40,7 @@ namespace Quanlicuahang.Repositories
             var paymentsQuery = from o in _context.Orders
                                 join p in _context.Payments on o.Id equals p.OrderId
                                 where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
-                                      && o.Status == "Completed"
+                                      && o.Status == OrderStatus.Paid
                                       && o.IsDeleted == false
                                 group new { o, p } by o.OrderDate.Date into g
                                 select new
@@ -52,8 +53,8 @@ namespace Quanlicuahang.Repositories
             // Get returns grouped by date
             var returnsQuery = from o in _context.Orders
                                join r in _context.Returns on o.Id equals r.OrderId
-                               where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
-                                     && o.Status == "Completed"
+                                where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
+                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
                                group r by o.OrderDate.Date into g
                                select new
@@ -94,7 +95,7 @@ namespace Quanlicuahang.Repositories
             var paymentsQuery = from o in _context.Orders
                                 join p in _context.Payments on o.Id equals p.OrderId
                                 where o.OrderDate >= startOfMonth && o.OrderDate <= endOfMonth
-                                      && o.Status == "Completed"
+                                      && o.Status == OrderStatus.Paid
                                       && o.IsDeleted == false
                                 group new { o, p } by new { o.OrderDate.Year, o.OrderDate.Month, o.OrderDate.Day } into g
                                 select new
@@ -110,7 +111,7 @@ namespace Quanlicuahang.Repositories
             var returnsQuery = from o in _context.Orders
                                join r in _context.Returns on o.Id equals r.OrderId
                                where o.OrderDate >= startOfMonth && o.OrderDate <= endOfMonth
-                                     && o.Status == "Completed"
+                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
                                group r by new { o.OrderDate.Year, o.OrderDate.Month, o.OrderDate.Day } into g
                                select new
@@ -140,7 +141,7 @@ namespace Quanlicuahang.Repositories
             return new { data, total };
         }
 
-        // Báo cáo doanh thu theo năm (theo tháng trong năm)
+         // Báo cáo doanh thu theo năm (theo tháng trong năm)
         public async Task<object> GetRevenueByYearAsync(int year, int skip, int take)
         {
             skip = skip < 0 ? 0 : skip;
@@ -153,7 +154,7 @@ namespace Quanlicuahang.Repositories
             var paymentsQuery = from o in _context.Orders
                                 join p in _context.Payments on o.Id equals p.OrderId
                                 where o.OrderDate >= startOfYear && o.OrderDate <= endOfYear
-                                      && o.Status == "Completed"
+                                      && o.Status == OrderStatus.Paid
                                       && o.IsDeleted == false
                                 group new { o, p } by new { o.OrderDate.Year, o.OrderDate.Month } into g
                                 select new
@@ -168,7 +169,7 @@ namespace Quanlicuahang.Repositories
             var returnsQuery = from o in _context.Orders
                                join r in _context.Returns on o.Id equals r.OrderId
                                where o.OrderDate >= startOfYear && o.OrderDate <= endOfYear
-                                     && o.Status == "Completed"
+                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
                                group r by new { o.OrderDate.Year, o.OrderDate.Month } into g
                                select new
@@ -228,7 +229,7 @@ namespace Quanlicuahang.Repositories
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
                             (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == "Completed" &&
+                            x.o.Status == OrderStatus.Paid &&
                             !x.o.IsDeleted &&
                             x.p != null
                         )
@@ -239,7 +240,7 @@ namespace Quanlicuahang.Repositories
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
                             (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == "Completed" &&
+                            x.o.Status == OrderStatus.Paid &&
                             !x.o.IsDeleted
                         )
                         .Sum(x => (decimal?)((x.o.TotalAmount) - (x.o.DiscountAmount))) ?? 0,
@@ -249,7 +250,7 @@ namespace Quanlicuahang.Repositories
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
                             (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == "Completed" &&
+                            x.o.Status == OrderStatus.Paid &&
                             !x.o.IsDeleted
                         )
                         .Select(x => x.o.Id)
@@ -280,7 +281,7 @@ namespace Quanlicuahang.Repositories
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
                             (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == "Completed" &&
+                            x.o.Status == OrderStatus.Paid &&
                             !x.o.IsDeleted &&
                             x.r != null
                         )
@@ -330,7 +331,7 @@ namespace Quanlicuahang.Repositories
                                 join p in _context.Payments on o.Id equals p.OrderId
                                 where (fromDate == null || o.OrderDate >= fromDate) 
                                       && (toDate == null || o.OrderDate < realToDate)
-                                      && o.Status == "Completed"
+                                      && o.Status == OrderStatus.Paid
                                       && o.IsDeleted == false
                                       // Lọc theo khu vực nếu được chỉ định
                                       && (string.IsNullOrEmpty(normalizedRegion) 
@@ -353,7 +354,7 @@ namespace Quanlicuahang.Repositories
                                join r in _context.Returns on o.Id equals r.OrderId
                                where (fromDate == null || o.OrderDate >= fromDate) 
                                      && (toDate == null || o.OrderDate < realToDate)
-                                     && o.Status == "Completed"
+                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
                                      // Lọc theo khu vực nếu được chỉ định
                                      && (string.IsNullOrEmpty(normalizedRegion) 
@@ -405,9 +406,9 @@ namespace Quanlicuahang.Repositories
                             from category in categories.DefaultIfEmpty()
                             where (fromDate == null || o.OrderDate >= fromDate) 
                                   && (toDate == null || o.OrderDate <= toDate)
-                                  && o.Status == "Completed"
+                                  && o.Status == OrderStatus.Paid
                                   && o.IsDeleted == false
-                            group new { oi, category } by new { prod.Id, prod.Name, CategoryName = category != null ? category.Name : "Không phân loại" } into g
+                            group new { oi, category } by new { prod.Id, prod.Name, CategoryName = category != null ? category.Name : "Kh�ng ph�n lo?i" } into g
                             select new
                             {
                                 ProductId = g.Key.Id,
@@ -466,7 +467,7 @@ namespace Quanlicuahang.Repositories
                                      prod.Id, 
                                      prod.Name, 
                                      prod.Price,
-                                     CategoryName = category != null ? category.Name : "Không phân loại" 
+                                     CategoryName = category != null ? category.Name : "Kh�ng ph�n lo?i" 
                                  } into g
                                  select new
                                  {
@@ -480,7 +481,7 @@ namespace Quanlicuahang.Repositories
             // Query để lấy số lượng đã bán (tất cả thời gian)
             var soldQuery = from oi in _context.OrderItems
                             join o in _context.Orders on oi.OrderId equals o.Id
-                            where o.Status == "Completed" && !o.IsDeleted
+                            where o.Status == OrderStatus.Paid && !o.IsDeleted
                             group oi by oi.ProductId into g
                             select new
                             {

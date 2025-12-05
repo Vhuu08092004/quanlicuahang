@@ -3,6 +3,7 @@ using Quanlicuahang.DTOs.Order;
 using Quanlicuahang.Helpers;
 using Quanlicuahang.Models;
 using Quanlicuahang.Repositories;
+using Quanlicuahang.Enum;
 
 namespace Quanlicuahang.Services
 {
@@ -23,6 +24,7 @@ namespace Quanlicuahang.Services
         private readonly IInventoryRepository _inventoryRepo;
         private readonly IProductRepository _productRepo;
         private readonly IUserRepository _userRepo;
+        private readonly IPaymentRepository _paymentRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
@@ -32,6 +34,7 @@ namespace Quanlicuahang.Services
             IInventoryRepository inventoryRepo,
             IProductRepository productRepo,
             IUserRepository userRepo,
+            IPaymentRepository paymentRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper)
@@ -40,6 +43,7 @@ namespace Quanlicuahang.Services
             _inventoryRepo = inventoryRepo;
             _productRepo = productRepo;
             _userRepo = userRepo;
+            _paymentRepo = paymentRepo;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -70,8 +74,10 @@ namespace Quanlicuahang.Services
                 }
                 if (!string.IsNullOrWhiteSpace(w.Status))
                 {
-                    var st = w.Status.Trim().ToLower();
-                    query = query.Where(o => o.Status.ToLower() == st);
+                    if (System.Enum.TryParse<OrderStatus>(w.Status, true, out var status))
+                    {
+                        query = query.Where(o => o.Status == status);
+                    }
                 }
                 if (w.FromDate.HasValue)
                 {
@@ -101,21 +107,20 @@ namespace Quanlicuahang.Services
                     CustomerId = o.CustomerId,
                     CustomerName = o.Customer != null ? o.Customer.Name : null,
                     PromotionId = o.PromoId,
-                    TotalAmount = o.TotalAmount - o.DiscountAmount, // FE expects net
+                    TotalAmount = o.TotalAmount - o.DiscountAmount,
                     DiscountAmount = o.DiscountAmount,
-                    Status = o.Status,
+                    Status = o.Status.ToString(),
                     CreatedAt = o.CreatedAt,
                     CreatedByName = o.User != null ? o.User.FullName : null,
                     IsDeleted = o.IsDeleted,
                     isCanView = true,
                     isCanCreate = true,
-                    isCanEdit = o.Status.ToLower() == "pending" && !o.IsDeleted,
+                    isCanEdit = o.Status == OrderStatus.Pending && !o.IsDeleted,
                     isCanDeActive = !o.IsDeleted,
                     isCanActive = o.IsDeleted,
                     isCanUpdateStatus = !o.IsDeleted,
-                    isCanCancel = o.Status.ToLower() == "pending" && !o.IsDeleted,
-                    isCanDeliver = (o.Status.ToLower() == "pending" || o.Status.ToLower() == "paid") && !o.IsDeleted,
-                    isCanComplete = (o.Status.ToLower() == "delivering" || o.Status.ToLower() == "pending" || o.Status.ToLower() == "paid") && !o.IsDeleted
+                    isCanCancel = o.Status == OrderStatus.Pending && !o.IsDeleted,
+                    isCanDeliver = (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Paid) && !o.IsDeleted,
                 })
                 .ToListAsync();
 
@@ -139,7 +144,7 @@ namespace Quanlicuahang.Services
                     PromotionId = o.PromoId,
                     TotalAmount = o.TotalAmount - o.DiscountAmount,
                     DiscountAmount = o.DiscountAmount,
-                    Status = o.Status,
+                    Status = o.Status.ToString(),
                     CreatedAt = o.CreatedAt,
                     CreatedByName = o.User != null ? (o.User.FullName ?? o.User.Username) : null,
                     IsDeleted = o.IsDeleted,
@@ -178,6 +183,12 @@ namespace Quanlicuahang.Services
                     throw new System.Exception($"Sản phẩm {item.ProductId} không đủ tồn kho. Còn {available}");
             }
 
+            // Validate payment method
+            if (!System.Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod))
+            {
+                throw new System.Exception($"Phương thức thanh toán không hợp lệ: {dto.PaymentMethod}. Các phương thức hỗ trợ: {string.Join(", ", System.Enum.GetNames<PaymentMethod>())}");
+            }
+
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
 
             // Kiểm tra userId có tồn tại trong database không
@@ -197,6 +208,9 @@ namespace Quanlicuahang.Services
             // Gross and discount
             var gross = dto.Items.Sum(x => x.UnitPrice * x.Quantity);
             var discount = dto.DiscountAmount;
+            var netAmount = gross - discount;
+
+            var orderDate = DateTime.UtcNow;
 
             var order = new Order
             {
@@ -205,10 +219,11 @@ namespace Quanlicuahang.Services
                 CustomerId = string.IsNullOrWhiteSpace(dto.CustomerId) ? null : dto.CustomerId,
                 UserId = validUserId,
                 PromoId = string.IsNullOrWhiteSpace(dto.PromotionId) ? null : dto.PromotionId,
-                OrderDate = DateTime.UtcNow,
-                Status = "pending",
+                OrderDate = orderDate,
+                Status = netAmount > 0 ? OrderStatus.Pending : OrderStatus.Paid,
                 TotalAmount = gross,
                 DiscountAmount = discount,
+                PaidAmount = 0,
                 CreatedBy = validUserId ?? "system",
                 UpdatedBy = validUserId ?? "system",
                 CreatedAt = DateTime.UtcNow,
@@ -233,10 +248,6 @@ namespace Quanlicuahang.Services
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                // Use DbContext via repository
-                // No direct repository for OrderItem; Use orderRepo context via tracking
-                // Workaround: Use EF context from orderRepo through _productRepo context? Not exposed. So attach through productRepo's context.
-                // Instead: Add to order navigation
                 order.OrderItems.Add(oi);
             }
 
@@ -260,7 +271,7 @@ namespace Quanlicuahang.Services
             // Persist order + items
             await _orderRepo.SaveChangesAsync();
 
-            // Create stock-out inventory records to adjust available quantity
+            // Create stock-out inventory records
             foreach (var item in dto.Items)
             {
                 var stockOut = new Inventory
@@ -278,6 +289,87 @@ namespace Quanlicuahang.Services
                 await _inventoryRepo.AddAsync(stockOut);
             }
 
+            // Create payment automatically if requested and amount > 0
+            if (dto.CreatePayment && netAmount > 0)
+            {
+                // Nếu là thanh toán tiền mặt - tạo thanh toán ngay với trạng thái Completed
+                if (paymentMethod == PaymentMethod.Cash)
+                {
+                    var payment = new Payment
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Code = GeneratePaymentCode(),
+                        OrderId = order.Id,
+                        Amount = netAmount,
+                        PaymentMethod = paymentMethod,
+                        PaymentStatus = PaymentStatus.Completed,
+                        PaymentDate = DateTime.UtcNow,
+                        IsAutoGenerated = true,
+                        Note = dto.PaymentNote ?? "Thanh toán tiền mặt khi tạo đơn hàng",
+                        CreatedBy = validUserId ?? "system",
+                        UpdatedBy = validUserId ?? "system",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _paymentRepo.AddAsync(payment);
+
+                    // Cập nhật trạng thái đơn hàng thành Paid ngay lập tức
+                    order.Status = OrderStatus.Paid;
+                    order.PaidAmount = netAmount;
+                    order.UpdatedBy = validUserId ?? "system";
+                    order.UpdatedAt = DateTime.UtcNow;
+
+                    await _logService.LogAsync(
+                        code: Guid.NewGuid().ToString(),
+                        action: "Create",
+                        entityType: "Payments",
+                        entityId: payment.Id,
+                        description: $"Tạo phiếu thanh toán tiền mặt cho đơn hàng {order.Code} - {netAmount:C}",
+                        oldValue: null,
+                        newValue: new { payment.Id, payment.Code, payment.OrderId, payment.Amount, payment.PaymentMethod, payment.PaymentDate, payment.PaymentStatus, payment.IsAutoGenerated },
+                        userId: validUserId ?? "system",
+                        ip: ip,
+                        userAgent: agent
+                    );
+                }
+                else
+                {
+                    // Các phương thức khác - tạo payment với trạng thái Pending, chờ xác nhận thanh toán
+                    var pendingPayment = new Payment
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Code = GeneratePaymentCode(),
+                        OrderId = order.Id,
+                        Amount = netAmount,
+                        PaymentMethod = paymentMethod,
+                        PaymentStatus = PaymentStatus.Pending,
+                        PaymentDate = DateTime.UtcNow,
+                        IsAutoGenerated = true,
+                        Note = dto.PaymentNote ?? $"Thanh toán {paymentMethod} - đang chờ xử lý",
+                        CreatedBy = validUserId ?? "system",
+                        UpdatedBy = validUserId ?? "system",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _paymentRepo.AddAsync(pendingPayment);
+
+                    await _logService.LogAsync(
+                        code: Guid.NewGuid().ToString(),
+                        action: "CreatePendingPayment",
+                        entityType: "Payments",
+                        entityId: pendingPayment.Id,
+                        description: $"Tạo phiếu thanh toán {paymentMethod} cho đơn hàng {order.Code} - {netAmount:C} (Pending)",
+                        oldValue: null,
+                        newValue: new { pendingPayment.Id, pendingPayment.Code, pendingPayment.OrderId, pendingPayment.Amount, pendingPayment.PaymentMethod, pendingPayment.PaymentStatus, pendingPayment.IsAutoGenerated },
+                        userId: validUserId ?? "system",
+                        ip: ip,
+                        userAgent: agent
+                    );
+                }
+            }
+
             await _orderRepo.SaveChangesAsync();
 
             await _logService.LogAsync(
@@ -293,6 +385,7 @@ namespace Quanlicuahang.Services
                     order.Code,
                     order.TotalAmount,
                     order.DiscountAmount,
+                    PaymentMethod = paymentMethod,
                     Items = dto.Items.Select(x => new { x.ProductId, x.Quantity, x.UnitPrice }).ToList()
                 },
                 userId: validUserId ?? "system",
@@ -300,7 +393,16 @@ namespace Quanlicuahang.Services
                 userAgent: agent
             );
 
-            return (await GetByIdAsync(order.Id))!;
+            var result = (await GetByIdAsync(order.Id))!;
+            
+            // Thêm thông tin về việc cần thanh toán QR
+            if (paymentMethod != PaymentMethod.Cash && dto.CreatePayment && netAmount > 0)
+            {
+                result.Items = result.Items ?? new List<OrderItemDto>(); // Ensure Items is not null
+                // Có thể thêm metadata về QR payment requirement vào đây nếu cần
+            }
+            
+            return result;
         }
 
         public async Task<OrderDto> UpdateAsync(string id, OrderUpdateDto dto)
@@ -321,18 +423,17 @@ namespace Quanlicuahang.Services
             // 1) Cập nhật trạng thái nếu có
             if (!string.IsNullOrWhiteSpace(dto.Status))
             {
-                var from = (order.Status ?? "pending").Trim().ToLower();
-                var to = dto.Status!.Trim().ToLower();
+                if (!System.Enum.TryParse<OrderStatus>(dto.Status, true, out var newStatus))
+                    throw new System.Exception($"Trạng thái không hợp lệ: {dto.Status}");
 
-                var allowed =
-                    (from == "pending" && (to == "paid" || to == "cancelled" || to == "delivering")) ||
-                    (from == "paid" && (to == "delivering")) ||
-                    (from == "delivering" && (to == "completed"));
+                var currentStatus = order.Status;
+
+                var allowed = IsStatusTransitionAllowed(currentStatus, newStatus);
 
                 if (!allowed)
-                    throw new System.Exception($"Chuyển trạng thái {from} -> {to} không hợp lệ.");
+                    throw new System.Exception($"Chuyển trạng thái {currentStatus} -> {newStatus} không hợp lệ.");
 
-                if (to == "cancelled")
+                if (newStatus == OrderStatus.Cancelled)
                 {
                     // Hoàn kho theo số lượng hiện tại của đơn
                     var groups = order.OrderItems.Where(oi => !oi.IsDeleted)
@@ -366,7 +467,7 @@ namespace Quanlicuahang.Services
                     }
                 }
 
-                order.Status = to;
+                order.Status = newStatus;
                 order.UpdatedBy = userId;
                 order.UpdatedAt = DateTime.UtcNow;
                 _orderRepo.Update(order);
@@ -377,9 +478,9 @@ namespace Quanlicuahang.Services
                     action: "UpdateStatus",
                     entityType: "Orders",
                     entityId: order.Id,
-                    description: $"Cập nhật trạng thái: {from} -> {to}",
-                    oldValue: new { Status = from },
-                    newValue: new { Status = to },
+                    description: $"Cập nhật trạng thái: {currentStatus} -> {newStatus}",
+                    oldValue: new { Status = currentStatus },
+                    newValue: new { Status = newStatus },
                     userId: userId,
                     ip: ip,
                     userAgent: agent
@@ -389,7 +490,7 @@ namespace Quanlicuahang.Services
             }
 
             // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending
-            if ((order.Status ?? "").Trim().ToLower() != "pending")
+            if (order.Status != OrderStatus.Pending)
                 throw new System.Exception("Chỉ cho phép chỉnh sửa khi đơn hàng đang Pending");
 
             // Validate items nếu được truyền vào
@@ -422,7 +523,7 @@ namespace Quanlicuahang.Services
                 {
                     var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
                     var newQty = newGroups.ContainsKey(pid) ? newGroups[pid] : 0;
-                    var delta = newQty - oldQty; // >0: trừ thêm, <0: trả lại
+                    var delta = newQty - oldQty;
 
                     if (delta != 0)
                     {
@@ -443,7 +544,7 @@ namespace Quanlicuahang.Services
                             Id = Guid.NewGuid().ToString(),
                             Code = GenerateCode("INVADJ"),
                             ProductId = pid,
-                            Quantity = -delta, // delta>0 xuất kho, delta<0 nhập trả
+                            Quantity = -delta,
                             CreatedBy = userId,
                             UpdatedBy = userId,
                             CreatedAt = DateTime.UtcNow,
@@ -527,6 +628,32 @@ namespace Quanlicuahang.Services
             return $"{prefix.ToLower()}-{timestamp}-{randomPart}";
         }
 
+        private static string GeneratePaymentCode()
+        {
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var randomPart = Guid.NewGuid().ToString("N").Substring(0, 6);
+            return $"pay-{timestamp}-{randomPart}";
+        }
+
+        private static bool IsStatusTransitionAllowed(OrderStatus currentStatus, OrderStatus newStatus)
+        {
+            return currentStatus switch
+            {
+                OrderStatus.Pending => newStatus == OrderStatus.Confirmed || 
+                                     newStatus == OrderStatus.Paid || 
+                                     newStatus == OrderStatus.Cancelled,
+                
+                OrderStatus.Confirmed => newStatus == OrderStatus.Paid || 
+                                       newStatus == OrderStatus.Cancelled,
+                
+                OrderStatus.Paid => newStatus == OrderStatus.Cancelled,
+                
+                OrderStatus.Cancelled => false, // Không thể chuyển từ Cancelled sang trạng thái khác
+                
+                _ => false
+            };
+        }
+
         public async Task<List<OrderDto>> GetPurchaseHistoryByCustomerAsync(string customerId)
         {
             if (string.IsNullOrWhiteSpace(customerId))
@@ -549,7 +676,7 @@ namespace Quanlicuahang.Services
                     CustomerName = o.Customer != null ? o.Customer.Name : null,
                     TotalAmount = o.TotalAmount - o.DiscountAmount,
                     DiscountAmount = o.DiscountAmount,
-                    Status = o.Status,
+                    Status = o.Status.ToString(),
                     CreatedAt = o.CreatedAt,
                     CreatedByName = o.User != null ? (o.User.FullName ?? o.User.Username) : null,
                     Items = o.OrderItems

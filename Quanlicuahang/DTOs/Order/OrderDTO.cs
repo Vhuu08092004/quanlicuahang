@@ -11,12 +11,15 @@ namespace Quanlicuahang.DTOs.Order
         public string? PromotionId { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal DiscountAmount { get; set; }
-        public string Status { get; set; } = "pending";
+        public decimal PaidAmount { get; set; }
+        public decimal RemainingAmount => TotalAmount - DiscountAmount - PaidAmount;
+        public bool IsFullyPaid => PaidAmount >= (TotalAmount - DiscountAmount);
+        public string Status { get; set; } = Enum.OrderStatus.Pending.ToString();
+        public DateTime OrderDate { get; set; }
         public DateTime CreatedAt { get; set; }
         public string? CreatedByName { get; set; }
         public bool IsDeleted { get; set; }
 
-        // Optional action flags for FE
         public bool isCanView { get; set; } = true;
         public bool isCanCreate { get; set; } = true;
         public bool isCanEdit { get; set; } = true;
@@ -28,6 +31,7 @@ namespace Quanlicuahang.DTOs.Order
         public bool isCanComplete { get; set; } = true;
 
         public List<OrderItemDto> Items { get; set; } = new();
+        public List<PaymentInfoDto> Payments { get; set; } = new();
     }
 
     public class OrderItemCreateDto
@@ -43,18 +47,31 @@ namespace Quanlicuahang.DTOs.Order
     public class OrderCreateDto
     {
         public string? CustomerId { get; set; }
-        public string? CustomerName { get; set; }
+        
+        public string? CustomerName { get; set; } 
+        
         [Required]
         public List<OrderItemCreateDto> Items { get; set; } = new();
+        
         public string? PromotionId { get; set; }
+        
         public decimal DiscountAmount { get; set; }
-        public decimal TotalAmount { get; set; }
+        
+        public decimal TotalAmount { get; set; } 
+
+        [Required]
+        public string PaymentMethod { get; set; } = Enum.PaymentMethod.Cash.ToString();
+        
+        public string? PaymentNote { get; set; }
+        
+        public bool CreatePayment { get; set; } = true; 
+
+        public bool RequireQRPayment { get; set; } = false; 
     }
 
     public class OrderUpdateDto
     {
         public string? CustomerId { get; set; }
-        public string? CustomerName { get; set; }
         public List<OrderItemCreateDto>? Items { get; set; }
         public string? PromotionId { get; set; }
         public decimal? DiscountAmount { get; set; }
@@ -69,6 +86,17 @@ namespace Quanlicuahang.DTOs.Order
         public string? ProductName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+    }
+
+    public class PaymentInfoDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string PaymentStatus { get; set; } = string.Empty;
+        public DateTime PaymentDate { get; set; }
+        public string? Note { get; set; }
+        public bool IsDeleted { get; set; }
     }
 
     public class OrderWhereDto
