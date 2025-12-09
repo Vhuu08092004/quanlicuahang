@@ -100,6 +100,8 @@ namespace Quanlicuahang.Services
                     Price = p.Price,
                     Unit = p.Unit,
                     Quantity = p.Quantity,
+                    ImageUrl = p.ImageUrl,
+
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
                     SupplierId = p.SupplierId,
@@ -135,6 +137,7 @@ namespace Quanlicuahang.Services
                     Price = p.Price,
                     Unit = p.Unit,
                     Quantity = p.Quantity,
+                    ImageUrl = p.ImageUrl,
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
                     SupplierId = p.SupplierId,
@@ -203,6 +206,7 @@ namespace Quanlicuahang.Services
                 Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim(),
                 Price = dto.Price,
                 Unit = dto.Unit.Trim(),
+                ImageUrl = dto.ImageUrl,
                 CategoryId = string.IsNullOrWhiteSpace(dto.CategoryId) ? null : dto.CategoryId,
                 SupplierId = string.IsNullOrWhiteSpace(dto.SupplierId) ? null : dto.SupplierId,
                 CreatedBy = userId,
@@ -304,17 +308,19 @@ namespace Quanlicuahang.Services
                 product.Barcode,
                 product.Price,
                 product.Unit,
+                product.ImageUrl,
                 product.CategoryId,
                 product.SupplierId,
             };
 
-          
+
 
             product.Code = dto.Code.Trim();
             product.Name = dto.Name.Trim();
             product.Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim();
             product.Price = dto.Price;
             product.Unit = dto.Unit.Trim();
+            product.ImageUrl = dto.ImageUrl;
             product.CategoryId = string.IsNullOrWhiteSpace(dto.CategoryId) ? null : dto.CategoryId;
             product.SupplierId = string.IsNullOrWhiteSpace(dto.SupplierId) ? null : dto.SupplierId;
             product.UpdatedBy = userId;

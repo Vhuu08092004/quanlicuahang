@@ -42,6 +42,10 @@ namespace Quanlicuahang.Models
 
         public bool IsFullyPaid => PaidAmount >= (TotalAmount - DiscountAmount);
 
+        // Thông tin khách hàng từ mobile (JSON string)
+        [MaxLength(2000)]
+        public string? Info { get; set; }
+
         public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }

@@ -11,6 +11,7 @@ namespace Quanlicuahang.DTOs.Product
         public decimal Price { get; set; }
         public string Unit { get; set; } = "pcs";
         public int Quantity { get; set; }
+        public string? ImageUrl { get; set; }
         public string? CategoryId { get; set; }
         public string? CategoryName { get; set; }
         public string? SupplierId { get; set; }
@@ -43,6 +44,7 @@ namespace Quanlicuahang.DTOs.Product
 
         public string? CategoryId { get; set; }
         public string? SupplierId { get; set; }
+        public string? ImageUrl { get; set; }
         public List<ProductAttributeValueCreateUpdateDto> Attributes { get; set; } = new();
     }
 

@@ -117,5 +117,28 @@ namespace Quanlicuahang.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        /// <summary>
+        /// API đặt hàng từ Mobile App - Không yêu cầu authentication
+        /// </summary>
+        [HttpPost("mobile/create")]
+        public async Task<IActionResult> CreateMobileOrder([FromBody] MobileOrderCreateDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _service.CreateMobileOrderAsync(dto);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { 
+                    success = false, 
+                    message = ex.Message 
+                });
+            }
+        }
     }
 }

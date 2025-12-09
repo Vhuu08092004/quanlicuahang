@@ -9,10 +9,12 @@ namespace Quanlicuahang.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IProductService _service;
+        private readonly IWebHostEnvironment _env;
 
-        public ProductController(IProductService service)
+        public ProductController(IProductService service, IWebHostEnvironment env)
         {
             _service = service;
+            _env = env;
         }
 
         [HttpPost("pagination")]
@@ -85,6 +87,68 @@ namespace Quanlicuahang.Controllers
         {
             var result = await _service.GetSelectBoxAsync();
             return Ok(result);
+        }
+
+        [HttpPost("upload-image")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("Vui lòng chọn file hình ảnh");
+
+            // Validate file type
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest("Chỉ chấp nhận file hình ảnh (jpg, jpeg, png, gif, webp)");
+
+            // Validate file size (max 5MB)
+            if (file.Length > 5 * 1024 * 1024)
+                return BadRequest("Kích thước file không được vượt quá 5MB");
+
+            try
+            {
+                // Create directory if not exists
+                var uploadsFolder = Path.Combine(_env.ContentRootPath, "assests", "images");
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                // Generate unique filename
+                var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                // Save file
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                // Return the relative URL
+                var imageUrl = $"/images/{uniqueFileName}";
+                return Ok(new { imageUrl, fileName = uniqueFileName });
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi upload hình ảnh: {ex.Message}");
+            }
+        }
+
+        [HttpDelete("delete-image/{fileName}")]
+        public IActionResult DeleteImage(string fileName)
+        {
+            try
+            {
+                var filePath = Path.Combine(_env.ContentRootPath, "assests", "images", fileName);
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                    return Ok("Xóa hình ảnh thành công");
+                }
+                return NotFound("Không tìm thấy hình ảnh");
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi xóa hình ảnh: {ex.Message}");
+            }
         }
     }
 }

@@ -8,6 +8,9 @@ namespace Quanlicuahang.DTOs.Order
         public string Code { get; set; } = string.Empty;
         public string? CustomerId { get; set; }
         public string? CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? CustomerAddress { get; set; }
+        public string? Note { get; set; }
         public string? PromotionId { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal DiscountAmount { get; set; }

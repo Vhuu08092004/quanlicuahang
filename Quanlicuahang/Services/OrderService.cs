@@ -16,6 +16,7 @@ namespace Quanlicuahang.Services
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
         Task<List<OrderDto>> GetPurchaseHistoryByCustomerAsync(string customerId);
+        Task<MobileOrderResponseDto> CreateMobileOrderAsync(MobileOrderCreateDto dto);
     }
 
     public class OrderService : IOrderService
@@ -96,22 +97,41 @@ namespace Quanlicuahang.Services
             }
 
             var total = await query.CountAsync();
-            var data = await query
+            var orders = await query
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip(skip)
                 .Take(take)
-                .Select(o => new OrderDto
+                .Select(o => new 
+                {
+                    o.Id,
+                    o.Code,
+                    o.CustomerId,
+                    CustomerName = o.Customer != null ? o.Customer.Name : null,
+                    o.PromoId,
+                    o.TotalAmount,
+                    o.DiscountAmount,
+                    o.Status,
+                    o.CreatedAt,
+                    CreatedByName = o.User != null ? o.User.FullName : null,
+                    o.IsDeleted,
+                    o.Info,
+                    o.UserId
+                })
+                .ToListAsync();
+            
+            var data = orders.Select(o => {
+                var dto = new OrderDto
                 {
                     Id = o.Id,
                     Code = o.Code,
                     CustomerId = o.CustomerId,
-                    CustomerName = o.Customer != null ? o.Customer.Name : null,
+                    CustomerName = o.CustomerName,
                     PromotionId = o.PromoId,
                     TotalAmount = o.TotalAmount - o.DiscountAmount,
                     DiscountAmount = o.DiscountAmount,
                     Status = o.Status.ToString(),
                     CreatedAt = o.CreatedAt,
-                    CreatedByName = o.User != null ? o.User.FullName : null,
+                    CreatedByName = o.CreatedByName,
                     IsDeleted = o.IsDeleted,
                     isCanView = true,
                     isCanCreate = true,
@@ -121,8 +141,27 @@ namespace Quanlicuahang.Services
                     isCanUpdateStatus = !o.IsDeleted,
                     isCanCancel = o.Status == OrderStatus.Pending && !o.IsDeleted,
                     isCanDeliver = (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Paid) && !o.IsDeleted,
-                })
-                .ToListAsync();
+                };
+                
+                // Parse Info JSON if no Customer and no User
+                if (string.IsNullOrEmpty(o.CustomerId) && string.IsNullOrEmpty(o.UserId) && !string.IsNullOrEmpty(o.Info))
+                {
+                    try
+                    {
+                        var info = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(o.Info);
+                        if (info != null)
+                        {
+                            dto.CustomerName = info.ContainsKey("CustomerName") ? info["CustomerName"] : null;
+                            dto.CustomerPhone = info.ContainsKey("CustomerPhone") ? info["CustomerPhone"] : null;
+                            dto.CustomerAddress = info.ContainsKey("CustomerAddress") ? info["CustomerAddress"] : null;
+                            dto.Note = info.ContainsKey("Note") ? info["Note"] : null;
+                        }
+                    }
+                    catch { }
+                }
+                
+                return dto;
+            }).ToList();
 
             return new { data, total };
         }
@@ -160,6 +199,28 @@ namespace Quanlicuahang.Services
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
+            
+            // Parse Info JSON if no Customer and no User
+            if (order != null && string.IsNullOrEmpty(order.CustomerId) && string.IsNullOrEmpty(order.CreatedByName))
+            {
+                var orderEntity = await _orderRepo.GetByIdAsync(id);
+                if (orderEntity != null && !string.IsNullOrEmpty(orderEntity.Info))
+                {
+                    try
+                    {
+                        var info = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(orderEntity.Info);
+                        if (info != null)
+                        {
+                            order.CustomerName = info.ContainsKey("CustomerName") ? info["CustomerName"] : null;
+                            order.CustomerPhone = info.ContainsKey("CustomerPhone") ? info["CustomerPhone"] : null;
+                            order.CustomerAddress = info.ContainsKey("CustomerAddress") ? info["CustomerAddress"] : null;
+                            order.Note = info.ContainsKey("Note") ? info["Note"] : null;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            
             return order;
         }
 
@@ -394,14 +455,14 @@ namespace Quanlicuahang.Services
             );
 
             var result = (await GetByIdAsync(order.Id))!;
-            
+
             // Thêm thông tin về việc cần thanh toán QR
             if (paymentMethod != PaymentMethod.Cash && dto.CreatePayment && netAmount > 0)
             {
                 result.Items = result.Items ?? new List<OrderItemDto>(); // Ensure Items is not null
                 // Có thể thêm metadata về QR payment requirement vào đây nếu cần
             }
-            
+
             return result;
         }
 
@@ -639,17 +700,17 @@ namespace Quanlicuahang.Services
         {
             return currentStatus switch
             {
-                OrderStatus.Pending => newStatus == OrderStatus.Confirmed || 
-                                     newStatus == OrderStatus.Paid || 
+                OrderStatus.Pending => newStatus == OrderStatus.Confirmed ||
+                                     newStatus == OrderStatus.Paid ||
                                      newStatus == OrderStatus.Cancelled,
-                
-                OrderStatus.Confirmed => newStatus == OrderStatus.Paid || 
+
+                OrderStatus.Confirmed => newStatus == OrderStatus.Paid ||
                                        newStatus == OrderStatus.Cancelled,
-                
+
                 OrderStatus.Paid => newStatus == OrderStatus.Cancelled,
-                
+
                 OrderStatus.Cancelled => false, // Không thể chuyển từ Cancelled sang trạng thái khác
-                
+
                 _ => false
             };
         }
@@ -694,6 +755,169 @@ namespace Quanlicuahang.Services
                 .ToListAsync();
 
             return orders;
+        }
+
+        /// <summary>
+        /// API đặt hàng từ Mobile App - Tạo đơn hàng và trừ số lượng sản phẩm
+        /// </summary>
+        public async Task<MobileOrderResponseDto> CreateMobileOrderAsync(MobileOrderCreateDto dto)
+        {
+            // Validate sản phẩm tồn tại và đủ số lượng
+            foreach (var item in dto.Items)
+            {
+                var product = await _productRepo.GetByIdAsync(item.ProductId);
+                if (product == null)
+                {
+                    throw new System.Exception($"Sản phẩm '{item.ProductName}' không tồn tại");
+                }
+
+                if (product.IsDeleted)
+                {
+                    throw new System.Exception($"Sản phẩm '{product.Name}' đã bị vô hiệu hóa");
+                }
+
+                // Kiểm tra tồn kho
+                var inventory = await _inventoryRepo.GetAll()
+                    .Where(i => i.ProductId == item.ProductId && !i.IsDeleted)
+                    .FirstOrDefaultAsync();
+
+                if (inventory == null || inventory.Quantity < item.Quantity)
+                {
+                    var available = inventory?.Quantity ?? 0;
+                    throw new System.Exception($"Sản phẩm '{product.Name}' chỉ còn {available} trong kho, không đủ để bán {item.Quantity}");
+                }
+            }
+
+            // Tạo mã đơn hàng tự động
+            var orderCode = $"MOB{DateTime.Now:yyyyMMddHHmmss}";
+
+            // Tạo JSON string thông tin khách hàng
+            var customerInfo = new
+            {
+                CustomerName = dto.CustomerName,
+                CustomerPhone = dto.CustomerPhone,
+                CustomerAddress = dto.CustomerAddress,
+                Note = dto.Note
+            };
+            var customerInfoJson = System.Text.Json.JsonSerializer.Serialize(customerInfo);
+
+            // Tạo Order
+            var order = new Models.Order
+            {
+                Id = Guid.NewGuid().ToString(),
+                Code = orderCode,
+                CustomerId = null, // Mobile app không có customer ID
+                UserId = null, // Không có user đặt hàng (khách vãng lai)
+                OrderDate = DateTime.UtcNow,
+                Status = OrderStatus.Pending,
+                TotalAmount = dto.TotalAmount,
+                DiscountAmount = 0,
+                PaidAmount = 0,
+                Info = customerInfoJson, // Lưu thông tin khách hàng dạng JSON
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "Mobile App",
+                IsDeleted = false
+            };
+
+            // Tạo OrderItems và trừ số lượng sản phẩm
+            var orderItems = new List<OrderItem>();
+            foreach (var item in dto.Items)
+            {
+                var orderItem = new OrderItem
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    OrderId = order.Id,
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    Price = item.Price,
+                    Subtotal = item.Price * item.Quantity,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "Mobile App",
+                    IsDeleted = false
+                };
+                orderItems.Add(orderItem);
+
+                // Trừ số lượng sản phẩm trong bảng Product
+                var product = await _productRepo.GetByIdAsync(item.ProductId);
+                if (product != null)
+                {
+                    product.Quantity -= item.Quantity;
+                    product.UpdatedAt = DateTime.UtcNow;
+                    product.UpdatedBy = "Mobile App";
+                    _productRepo.Update(product);
+                }
+
+                // Trừ số lượng sản phẩm trong bảng Inventory (nếu có quản lý kho)
+                var inventory = await _inventoryRepo.GetAll()
+                    .Where(i => i.ProductId == item.ProductId && !i.IsDeleted)
+                    .FirstOrDefaultAsync();
+
+                if (inventory != null)
+                {
+                    inventory.Quantity -= item.Quantity;
+                    inventory.UpdatedAt = DateTime.UtcNow;
+                    inventory.UpdatedBy = "Mobile App";
+                    _inventoryRepo.Update(inventory);
+                }
+            }
+
+            order.OrderItems = orderItems;
+
+            // Lưu order
+            await _orderRepo.AddAsync(order);
+            await _orderRepo.SaveChangesAsync();
+
+            // Tạo ghi chú về khách hàng trong payment note (dạng text thông thường)
+            var paymentNote = $"Khách hàng: {dto.CustomerName}\nSĐT: {dto.CustomerPhone}\nĐịa chỉ: {dto.CustomerAddress}";
+            if (!string.IsNullOrWhiteSpace(dto.Note))
+            {
+                paymentNote += $"\nGhi chú: {dto.Note}";
+            }
+
+            // Tạo payment record (chưa thanh toán)
+            var payment = new Payment
+            {
+                Id = Guid.NewGuid().ToString(),
+                OrderId = order.Id,
+                Amount = 0, // Chưa thanh toán
+                PaymentMethod = PaymentMethod.Cash,
+                PaymentStatus = PaymentStatus.Pending,
+                PaymentDate = DateTime.UtcNow,
+                Note = paymentNote,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "Mobile App",
+                IsDeleted = false
+            };
+
+            await _paymentRepo.AddAsync(payment);
+            await _paymentRepo.SaveChangesAsync();
+
+            // Log action
+            try
+            {
+                await _logService.LogAsync(
+                    code: orderCode,
+                    action: "CREATE_MOBILE_ORDER",
+                    entityType: "Order",
+                    entityId: order.Id,
+                    description: $"Đơn hàng {orderCode} được tạo từ Mobile App. Khách hàng: {dto.CustomerName}, SĐT: {dto.CustomerPhone}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: null,
+                    ip: null,
+                    userAgent: "Mobile App"
+                );
+            }
+            catch { /* Ignore log errors */ }
+
+            return new MobileOrderResponseDto
+            {
+                OrderId = order.Id,
+                OrderCode = orderCode,
+                Success = true,
+                Message = "Đặt hàng thành công! Đơn hàng của bạn đang được xử lý.",
+                OrderDate = order.OrderDate
+            };
         }
     }
 }

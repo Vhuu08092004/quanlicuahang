@@ -22,6 +22,9 @@ public class Product : BasePrimary
 
     public int Quantity { get; set; } = 0;
 
+    [MaxLength(500)]
+    public string? ImageUrl { get; set; }
+
     public string? CategoryId { get; set; }
     [ForeignKey(nameof(CategoryId))]
     public virtual Category? Category { get; set; }
