@@ -7,6 +7,7 @@ using System.Text;
 using Quanlicuahang.Services;
 using Quanlicuahang.Repositories;
 using Quanlicuahang.Helpers;
+using Microsoft.Extensions.FileProviders;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -124,6 +125,18 @@ else
 
 app.UseCors("AllowReactApp");
 app.UseCors(MyAllowSpecificOrigins);
+
+// Configure static files to serve images from assests/images folder
+var imagesPath = Path.Combine(builder.Environment.ContentRootPath, "assests", "images");
+if (!Directory.Exists(imagesPath))
+    Directory.CreateDirectory(imagesPath);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(imagesPath),
+    RequestPath = "/images"
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
