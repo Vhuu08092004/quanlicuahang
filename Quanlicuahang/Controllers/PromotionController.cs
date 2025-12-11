@@ -64,12 +64,12 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<Quanlicuahang.DTOs.Promotion.PromotionListDto>> UpdatePromotion(string id, [FromBody] Promotion promotion)
+        public async Task<ActionResult<Quanlicuahang.DTOs.Promotion.PromotionListDto>> UpdatePromotion(string id, [FromBody] Quanlicuahang.DTOs.Promotion.UpdatePromotionDto updateDto)
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
-                var updatedPromotion = await _promotionService.UpdatePromotionAsync(id, promotion, userId);
+                var updatedPromotion = await _promotionService.UpdatePromotionAsync(id, updateDto, userId);
                 return Ok(MapToListDto(updatedPromotion));
             }
             catch (KeyNotFoundException ex)

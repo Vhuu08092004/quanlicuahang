@@ -14,6 +14,7 @@ namespace Quanlicuahang.Services
         Task<PromotionDetailDTO?> GetPromotionDetailByIdAsync(string id);
         Task<Promotion> CreatePromotionAsync(Promotion promotion, string userId);
         Task<Promotion> UpdatePromotionAsync(string id, Promotion promotion, string userId);
+        Task<Promotion> UpdatePromotionAsync(string id, DTOs.Promotion.UpdatePromotionDto updateDto, string userId);
         Task<bool> DeletePromotionAsync(string id);
         Task<bool> DeactivatePromotionAsync(string id, string userId);
         Task<bool> ActivatePromotionAsync(string id, string userId);
@@ -262,6 +263,32 @@ namespace Quanlicuahang.Services
             existingPromotion.MinOrderAmount = promotion.MinOrderAmount;
             existingPromotion.UsageLimit = promotion.UsageLimit;
             existingPromotion.Status = promotion.Status;
+            existingPromotion.UpdatedBy = userId;
+            existingPromotion.UpdatedAt = DateTime.UtcNow;
+
+            return await _promotionRepository.UpdatePromotionAsync(existingPromotion);
+        }
+
+        public async Task<Promotion> UpdatePromotionAsync(string id, DTOs.Promotion.UpdatePromotionDto updateDto, string userId)
+        {
+            var existingPromotion = await _promotionRepository.GetPromotionByIdAsync(id)
+                ?? throw new KeyNotFoundException($"Promotion with ID {id} not found");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ValidationException("User ID is required to update a promotion");
+
+            // Validate dates
+            if (updateDto.EndDate <= updateDto.StartDate)
+                throw new ValidationException("End date must be after start date");
+
+            if (!IsValidStatus(updateDto.Status))
+                throw new ValidationException("Invalid status. Must be 'active' or 'inactive'");
+
+            // Update only allowed properties
+            existingPromotion.Description = updateDto.Description;
+            existingPromotion.StartDate = updateDto.StartDate;
+            existingPromotion.EndDate = updateDto.EndDate;
+            existingPromotion.Status = updateDto.Status;
             existingPromotion.UpdatedBy = userId;
             existingPromotion.UpdatedAt = DateTime.UtcNow;
 

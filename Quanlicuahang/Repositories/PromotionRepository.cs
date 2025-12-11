@@ -43,7 +43,6 @@ namespace Quanlicuahang.Repositories
         public async Task<Promotion?> GetPromotionByIdAsync(string id)
         {
             return await _context.Promotions
-                .Include(p => p.Orders)
                 .Where(p => p.IsDeleted == false)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
