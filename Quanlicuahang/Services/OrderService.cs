@@ -245,7 +245,7 @@ namespace Quanlicuahang.Services
             }
 
             // Validate payment method
-            if (!System.Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod))
+            if (!EnumHelper.TryParsePaymentMethod(dto.PaymentMethod, out var paymentMethod))
             {
                 throw new System.Exception($"Phương thức thanh toán không hợp lệ: {dto.PaymentMethod}. Các phương thức hỗ trợ: {string.Join(", ", System.Enum.GetNames<PaymentMethod>())}");
             }
@@ -684,9 +684,12 @@ namespace Quanlicuahang.Services
 
         private static string GenerateCode(string prefix)
         {
-            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var randomPart = Guid.NewGuid().ToString("N").Substring(0, 6);
-            return $"{prefix.ToLower()}-{timestamp}-{randomPart}";
+            var today = DateTime.UtcNow;
+            var dateStr = today.ToString("dd-MM-yyyy");
+            var sequence = today.Hour * 3600 + today.Minute * 60 + today.Second; // Use hour+minute+second as sequence
+            var sequenceStr = sequence.ToString("D4");
+            var milliseconds = today.Millisecond.ToString("D3");
+            return $"{prefix}_{sequenceStr}_{milliseconds}_{dateStr}";
         }
 
         private static string GeneratePaymentCode()
@@ -789,7 +792,7 @@ namespace Quanlicuahang.Services
             }
 
             // Tạo mã đơn hàng tự động
-            var orderCode = $"MOB{DateTime.Now:yyyyMMddHHmmss}";
+            var orderCode = GenerateCode("ORDER");
 
             // Tạo JSON string thông tin khách hàng
             var customerInfo = new

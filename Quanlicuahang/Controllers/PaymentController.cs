@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Quanlicuahang.DTOs.Payment;
+using Quanlicuahang.Enum;
+using Quanlicuahang.Helpers;
 using Quanlicuahang.Services;
 
 namespace Quanlicuahang.Controllers
@@ -107,12 +109,29 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("methods")]
-        public async Task<IActionResult> GetMethods()
+        public IActionResult GetMethods()
         {
             try
             {
-                var result = await _service.GetMethodsAsync();
+                // Legacy admin UI: return Vietnamese labels for display
+                var result = System.Enum.GetValues(typeof(PaymentMethod))
+                    .Cast<PaymentMethod>()
+                    .Select(EnumHelper.GetPaymentMethodName)
+                    .ToArray();
                 return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("method-options")]
+        public IActionResult GetMethodOptions()
+        {
+            try
+            {
+                return Ok(EnumHelper.GetPaymentMethodOptions());
             }
             catch (System.Exception ex)
             {
@@ -183,12 +202,32 @@ namespace Quanlicuahang.Controllers
         }
 
         [HttpGet("statuses")]
-        public async Task<IActionResult> GetStatuses()
+        public IActionResult GetStatuses()
         {
             try
             {
-                var result = await _service.GetStatusesAsync();
+                // Legacy admin UI: return Vietnamese labels for display
+                var result = new[]
+                {
+                    EnumHelper.GetPaymentStatusName(PaymentStatus.Failed),
+                    EnumHelper.GetPaymentStatusName(PaymentStatus.Pending),
+                    EnumHelper.GetPaymentStatusName(PaymentStatus.Completed),
+                    EnumHelper.GetPaymentStatusName(PaymentStatus.Cancelled)
+                };
                 return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("status-options")]
+        public IActionResult GetStatusOptions()
+        {
+            try
+            {
+                return Ok(EnumHelper.GetPaymentStatusOptions());
             }
             catch (System.Exception ex)
             {

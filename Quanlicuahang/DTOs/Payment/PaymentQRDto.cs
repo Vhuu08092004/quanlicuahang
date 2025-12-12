@@ -26,9 +26,11 @@ namespace Quanlicuahang.DTOs.Payment
         public string PaymentUrl { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public string? PaymentMethodName { get; set; }
         public DateTime ExpiryTime { get; set; }
         public string TransactionRef { get; set; } = string.Empty;
         public string Status { get; set; } = PaymentStatus.Pending.ToString();
+        public string? StatusName { get; set; }
     }
 
     public class PaymentVerificationDto

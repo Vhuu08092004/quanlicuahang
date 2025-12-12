@@ -9,7 +9,9 @@ namespace Quanlicuahang.DTOs.Payment
         public string? CustomerName { get; set; }
         public decimal Amount { get; set; }
         public string PaymentMethod { get; set; } = Enum.PaymentMethod.Cash.ToString();
+        public string? PaymentMethodName { get; set; }
         public string PaymentStatus { get; set; } = Enum.PaymentStatus.Pending.ToString();
+        public string? PaymentStatusName { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? OrderStatus { get; set; }
         public string? OperatorName { get; set; }

@@ -610,9 +610,12 @@ namespace Quanlicuahang.Services
 
         private static string GenerateCode(string prefix)
         {
-            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var randomPart = Guid.NewGuid().ToString("N").Substring(0, 6);
-            return $"{prefix.ToLower()}-{timestamp}-{randomPart}";
+            var today = DateTime.UtcNow;
+            var dateStr = today.ToString("dd-MM-yyyy");
+            var sequence = today.Hour * 3600 + today.Minute * 60 + today.Second; // Use hour+minute+second as sequence
+            var sequenceStr = sequence.ToString("D4");
+            var milliseconds = today.Millisecond.ToString("D3");
+            return $"{prefix}_{sequenceStr}_{milliseconds}_{dateStr}";
         }
     }
 }

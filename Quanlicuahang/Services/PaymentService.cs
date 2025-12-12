@@ -18,8 +18,8 @@ namespace Quanlicuahang.Services
         Task<bool> ActiveAsync(string id, string? reason = null);
         Task<object> GetHistoryByOrderAsync(string orderId);
         Task<object> GetCashflowAsync(PaymentCashflowFilterDto filter);
-        Task<string[]> GetMethodsAsync();
-        Task<string[]> GetStatusesAsync();
+        Task<object> GetMethodsAsync();
+        Task<object> GetStatusesAsync();
         Task<decimal> GetTotalPaidForOrderAsync(string orderId);
         Task<bool> UpdateOrderStatusBasedOnPaymentAsync(string orderId);
         Task<bool> CompletePaymentAsync(string paymentId, string? note = null);
@@ -53,7 +53,7 @@ namespace Quanlicuahang.Services
             _tokenHelper = tokenHelper;
         }
 
-         public async Task<object> GetAllAsync(PaymentSearchDto searchDto)
+        public async Task<object> GetAllAsync(PaymentSearchDto searchDto)
         {
             var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
             var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
@@ -73,7 +73,7 @@ namespace Quanlicuahang.Services
                 }
                 if (!string.IsNullOrWhiteSpace(w.PaymentMethod))
                 {
-                    if (System.Enum.TryParse<PaymentMethod>(w.PaymentMethod, true, out var method))
+                    if (EnumHelper.TryParsePaymentMethod(w.PaymentMethod, out var method))
                     {
                         query = query.Where(p => p.PaymentMethod == method);
                     }
@@ -85,7 +85,7 @@ namespace Quanlicuahang.Services
                 }
                 if (!string.IsNullOrWhiteSpace(w.OrderStatus))
                 {
-                    if (System.Enum.TryParse<OrderStatus>(w.OrderStatus, true, out var status))
+                    if (EnumHelper.TryParseOrderStatus(w.OrderStatus, out var status))
                     {
                         query = query.Where(p => p.Order != null && p.Order.Status == status);
                     }
@@ -149,7 +149,9 @@ namespace Quanlicuahang.Services
                 CustomerName = p.CustomerName,
                 Amount = p.Amount,
                 PaymentMethod = p.PaymentMethod.ToString(),
+                PaymentMethodName = EnumHelper.GetPaymentMethodName(p.PaymentMethod),
                 PaymentStatus = p.PaymentStatus.ToString(),
+                PaymentStatusName = EnumHelper.GetPaymentStatusName(p.PaymentStatus),
                 PaymentDate = p.PaymentDate,
                 IsDeleted = p.IsDeleted,
                 CreatedAt = p.CreatedAt,
@@ -166,7 +168,7 @@ namespace Quanlicuahang.Services
 
             return new { data, total };
         }
-       
+
         public async Task<PaymentDto?> GetByIdAsync(string id)
         {
             var raw = await _paymentRepo.GetAll(true)
@@ -209,7 +211,9 @@ namespace Quanlicuahang.Services
                 CustomerName = raw.CustomerName,
                 Amount = raw.Amount,
                 PaymentMethod = raw.PaymentMethod.ToString(),
+                PaymentMethodName = EnumHelper.GetPaymentMethodName(raw.PaymentMethod),
                 PaymentStatus = raw.PaymentStatus.ToString(),
+                PaymentStatusName = EnumHelper.GetPaymentStatusName(raw.PaymentStatus),
                 PaymentDate = raw.PaymentDate,
                 IsDeleted = raw.IsDeleted,
                 CreatedAt = raw.CreatedAt,
@@ -241,7 +245,7 @@ namespace Quanlicuahang.Services
             if (order == null || order.IsDeleted)
                 throw new System.Exception("Đơn hàng không tồn tại hoặc đã bị xóa");
 
-            if (!System.Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var method))
+            if (!EnumHelper.TryParsePaymentMethod(dto.PaymentMethod, out var method))
                 throw new System.Exception("Phương thức thanh toán không hợp lệ (Cash | BankTransfer | Card | Momo | VnPay | Zalo)");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
@@ -309,13 +313,13 @@ namespace Quanlicuahang.Services
             if (dto.Amount <= 0)
                 throw new System.Exception("Số tiền thanh toán phải lớn hơn 0");
 
-            if (!System.Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var method))
+            if (!EnumHelper.TryParsePaymentMethod(dto.PaymentMethod, out var method))
                 method = payment.PaymentMethod;
 
             PaymentStatus status = payment.PaymentStatus;
             if (!string.IsNullOrWhiteSpace(dto.PaymentStatus))
             {
-                if (!System.Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out status))
+                if (!EnumHelper.TryParsePaymentStatus(dto.PaymentStatus, out status))
                     status = payment.PaymentStatus;
             }
 
@@ -367,7 +371,6 @@ namespace Quanlicuahang.Services
 
             return true;
         }
-
 
         public async Task<bool> DeActiveAsync(string id, string? reason = null)
         {
@@ -450,6 +453,7 @@ namespace Quanlicuahang.Services
 
             return true;
         }
+
         public async Task<object> GetHistoryByOrderAsync(string orderId)
         {
             var list = await _paymentRepo.GetAll(true)
@@ -467,7 +471,9 @@ namespace Quanlicuahang.Services
                 CustomerName = p.Order.Customer?.Name,
                 Amount = p.Amount,
                 PaymentMethod = p.PaymentMethod.ToString(),
+                PaymentMethodName = EnumHelper.GetPaymentMethodName(p.PaymentMethod),
                 PaymentStatus = p.PaymentStatus.ToString(),
+                PaymentStatusName = EnumHelper.GetPaymentStatusName(p.PaymentStatus),
                 PaymentDate = p.PaymentDate,
                 IsDeleted = p.IsDeleted,
                 CreatedAt = p.CreatedAt,
@@ -489,16 +495,15 @@ namespace Quanlicuahang.Services
             );
         }
 
-        public Task<string[]> GetMethodsAsync()
+        public Task<object> GetMethodsAsync()
         {
-            return Task.FromResult(System.Enum.GetNames(typeof(PaymentMethod)));
+            return Task.FromResult(EnumHelper.GetPaymentMethods());
         }
 
-        public Task<string[]> GetStatusesAsync()
+        public Task<object> GetStatusesAsync()
         {
-            return Task.FromResult(System.Enum.GetNames(typeof(PaymentStatus)));
+            return Task.FromResult(EnumHelper.GetPaymentStatuses());
         }
-
 
         public async Task<Payment> CreatePaymentForOrderAsync(string orderId, decimal amount, PaymentMethod paymentMethod, string? note = null, bool isAutoGenerated = false, PaymentStatus paymentStatus = PaymentStatus.Completed)
         {
@@ -549,9 +554,9 @@ namespace Quanlicuahang.Services
                 throw new System.Exception($"Chỉ có thể hoàn thành thanh toán đang ở trạng thái Pending. Trạng thái hiện tại: {payment.PaymentStatus}");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            
+
             payment.PaymentStatus = PaymentStatus.Completed;
-            payment.PaymentDate = DateTime.UtcNow; 
+            payment.PaymentDate = DateTime.UtcNow;
             if (!string.IsNullOrWhiteSpace(note))
             {
                 payment.Note = string.IsNullOrWhiteSpace(payment.Note) ? note : $"{payment.Note}\n{note}";
@@ -590,7 +595,7 @@ namespace Quanlicuahang.Services
                 throw new System.Exception($"Chỉ có thể hủy thanh toán đang ở trạng thái Pending. Trạng thái hiện tại: {payment.PaymentStatus}");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            
+
             payment.PaymentStatus = PaymentStatus.Cancelled;
             if (!string.IsNullOrWhiteSpace(reason))
             {
@@ -631,13 +636,13 @@ namespace Quanlicuahang.Services
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
 
             order.PaidAmount = totalPaid;
-            
+
             if (totalPaid <= 0)
                 order.Status = OrderStatus.Pending;
             else if (totalPaid >= netAmount)
                 order.Status = OrderStatus.Paid;
             else
-                order.Status = OrderStatus.Confirmed; 
+                order.Status = OrderStatus.Confirmed;
 
             order.UpdatedBy = userId ?? order.UpdatedBy;
             order.UpdatedAt = DateTime.UtcNow;
@@ -647,7 +652,6 @@ namespace Quanlicuahang.Services
 
             return true;
         }
-
 
         public async Task<object> GetPendingPaymentsByOrderAsync(string orderId)
         {
@@ -664,7 +668,9 @@ namespace Quanlicuahang.Services
                     CustomerName = p.Order.Customer != null ? p.Order.Customer.Name : null,
                     Amount = p.Amount,
                     PaymentMethod = p.PaymentMethod.ToString(),
+                    PaymentMethodName = EnumHelper.GetPaymentMethodName(p.PaymentMethod),
                     PaymentStatus = p.PaymentStatus.ToString(),
+                    PaymentStatusName = EnumHelper.GetPaymentStatusName(p.PaymentStatus),
                     PaymentDate = p.PaymentDate,
                     CreatedAt = p.CreatedAt,
                     UpdatedAt = p.UpdatedAt,
@@ -679,7 +685,6 @@ namespace Quanlicuahang.Services
 
             return new { data = pendingPayments, total = pendingPayments.Count };
         }
-
 
         public async Task<object> GetAllPendingPaymentsAsync()
         {
@@ -696,7 +701,9 @@ namespace Quanlicuahang.Services
                     CustomerName = p.Order.Customer != null ? p.Order.Customer.Name : null,
                     Amount = p.Amount,
                     PaymentMethod = p.PaymentMethod.ToString(),
+                    PaymentMethodName = EnumHelper.GetPaymentMethodName(p.PaymentMethod),
                     PaymentStatus = p.PaymentStatus.ToString(),
+                    PaymentStatusName = EnumHelper.GetPaymentStatusName(p.PaymentStatus),
                     PaymentDate = p.PaymentDate,
                     CreatedAt = p.CreatedAt,
                     UpdatedAt = p.UpdatedAt,
