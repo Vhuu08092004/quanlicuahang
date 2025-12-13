@@ -36,5 +36,21 @@ namespace Quanlicuahang.Models
         public string Status { get; set; } = "active";
 
         public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
+        // Computed status based on dates and status field
+        public string GetComputedStatus()
+        {
+            var now = DateTime.UtcNow.Date;
+            var start = StartDate.Date;
+            var end = EndDate.Date;
+
+            if (now > end) return "expired";
+            
+            // For both upcoming and ongoing, check if paused
+            if (Status.ToLower() == "inactive") return "paused";
+            
+            if (now < start) return "upcoming";
+            return "ongoing";
+        }
     }
 }

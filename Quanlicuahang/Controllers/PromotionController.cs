@@ -153,6 +153,7 @@ namespace Quanlicuahang.Controllers
                 UsageLimit = p.UsageLimit,
                 UsedCount = p.UsedCount,
                 Status = p.Status,
+                ComputedStatus = p.GetComputedStatus(),
                 IsDeleted = p.IsDeleted,
                 CreatedAt = p.CreatedAt,
                 UpdatedAt = p.UpdatedAt,

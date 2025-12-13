@@ -145,36 +145,38 @@ namespace Quanlicuahang.Services
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip(skip)
                 .Take(take)
-                .Select(p => new PromotionListDto
-                {
-                    Id = p.Id,
-                    Code = p.Code,
-                    Description = p.Description,
-                    DiscountType = p.DiscountType,
-                    DiscountValue = p.DiscountValue,
-                    StartDate = p.StartDate,
-                    EndDate = p.EndDate,
-                    MinOrderAmount = p.MinOrderAmount,
-                    UsageLimit = p.UsageLimit,
-                    UsedCount = p.UsedCount,
-                    Status = p.Status,
-                    IsDeleted = p.IsDeleted,
-                    CreatedAt = p.CreatedAt,
-                    UpdatedAt = p.UpdatedAt,
-                    CreatedBy = p.CreatedBy,
-                    UpdatedBy = p.UpdatedBy,
-                    isCanView = true,
-                    isCanCreate = true,
-                    isCanEdit = !p.IsDeleted,
-                    isCanDelete = !p.IsDeleted,
-                    isCanActive = p.IsDeleted,
-                    isCanDeActive = !p.IsDeleted
-                })
                 .ToListAsync();
+
+            var dtoList = data.Select(p => new PromotionListDto
+            {
+                Id = p.Id,
+                Code = p.Code,
+                Description = p.Description,
+                DiscountType = p.DiscountType,
+                DiscountValue = p.DiscountValue,
+                StartDate = p.StartDate,
+                EndDate = p.EndDate,
+                MinOrderAmount = p.MinOrderAmount,
+                UsageLimit = p.UsageLimit,
+                UsedCount = p.UsedCount,
+                Status = p.Status,
+                ComputedStatus = p.GetComputedStatus(),
+                IsDeleted = p.IsDeleted,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                CreatedBy = p.CreatedBy,
+                UpdatedBy = p.UpdatedBy,
+                isCanView = true,
+                isCanCreate = true,
+                isCanEdit = !p.IsDeleted,
+                isCanDelete = !p.IsDeleted,
+                isCanActive = p.IsDeleted,
+                isCanDeActive = !p.IsDeleted
+            }).ToList();
 
             return new
             {
-                data,
+                data = dtoList,
                 total
             };
         }

@@ -14,5 +14,6 @@ namespace Quanlicuahang.DTOs.Promotion
         public int UsageLimit { get; set; }
         public int UsedCount { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string ComputedStatus { get; set; } = string.Empty;
     }
 }
