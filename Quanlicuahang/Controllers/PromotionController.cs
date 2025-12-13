@@ -150,6 +150,7 @@ namespace Quanlicuahang.Controllers
                 StartDate = p.StartDate,
                 EndDate = p.EndDate,
                 MinOrderAmount = p.MinOrderAmount,
+                MaxDiscount = p.MaxDiscount,
                 UsageLimit = p.UsageLimit,
                 UsedCount = p.UsedCount,
                 Status = p.Status,

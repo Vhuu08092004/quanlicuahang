@@ -80,6 +80,7 @@ namespace Quanlicuahang.Repositories
                 StartDate = promotion.StartDate,
                 EndDate = promotion.EndDate,
                 MinOrderAmount = promotion.MinOrderAmount,
+                MaxDiscount = promotion.MaxDiscount,
                 UsageLimit = promotion.UsageLimit,
                 UsedCount = promotion.UsedCount,
                 Status = promotion.Status,

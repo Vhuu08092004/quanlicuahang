@@ -29,6 +29,9 @@ namespace Quanlicuahang.Models
         [Column(TypeName = "decimal(10,2)")]
         public decimal MinOrderAmount { get; set; } = 0;
 
+        [Column(TypeName = "decimal(10,2)")]
+        public decimal MaxDiscount { get; set; } = 0;
+
         public int UsageLimit { get; set; } = 0;
         public int UsedCount { get; set; } = 0;
 

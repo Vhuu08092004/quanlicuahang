@@ -157,6 +157,7 @@ namespace Quanlicuahang.Services
                 StartDate = p.StartDate,
                 EndDate = p.EndDate,
                 MinOrderAmount = p.MinOrderAmount,
+                MaxDiscount = p.MaxDiscount,
                 UsageLimit = p.UsageLimit,
                 UsedCount = p.UsedCount,
                 Status = p.Status,
@@ -202,7 +203,7 @@ namespace Quanlicuahang.Services
                     p.Status.ToLower() == "active" &&
                     p.StartDate <= now &&
                     p.EndDate >= now &&
-                    (p.UsedCount < p.UsageLimit) &&
+                    (p.UsageLimit == 0 || p.UsedCount < p.UsageLimit) &&
                     orderAmount >= p.MinOrderAmount
                 )
                 .OrderByDescending(p => p.CreatedAt)
@@ -216,6 +217,7 @@ namespace Quanlicuahang.Services
                     StartDate = p.StartDate,
                     EndDate = p.EndDate,
                     MinOrderAmount = p.MinOrderAmount,
+                    MaxDiscount = p.MaxDiscount,
                     UsageLimit = p.UsageLimit,
                     UsedCount = p.UsedCount,
                     Status = p.Status,
@@ -263,6 +265,7 @@ namespace Quanlicuahang.Services
             existingPromotion.StartDate = promotion.StartDate;
             existingPromotion.EndDate = promotion.EndDate;
             existingPromotion.MinOrderAmount = promotion.MinOrderAmount;
+            existingPromotion.MaxDiscount = promotion.MaxDiscount;
             existingPromotion.UsageLimit = promotion.UsageLimit;
             existingPromotion.Status = promotion.Status;
             existingPromotion.UpdatedBy = userId;
@@ -283,14 +286,10 @@ namespace Quanlicuahang.Services
             if (updateDto.EndDate <= updateDto.StartDate)
                 throw new ValidationException("End date must be after start date");
 
-            if (!IsValidStatus(updateDto.Status))
-                throw new ValidationException("Invalid status. Must be 'active' or 'inactive'");
-
             // Update only allowed properties
             existingPromotion.Description = updateDto.Description;
             existingPromotion.StartDate = updateDto.StartDate;
             existingPromotion.EndDate = updateDto.EndDate;
-            existingPromotion.Status = updateDto.Status;
             existingPromotion.UpdatedBy = userId;
             existingPromotion.UpdatedAt = DateTime.UtcNow;
 

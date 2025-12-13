@@ -11,8 +11,5 @@ namespace Quanlicuahang.DTOs.Promotion
 
         [Required(ErrorMessage = "Ngày kết thúc là bắt buộc")]
         public DateTime EndDate { get; set; }
-
-        [Required(ErrorMessage = "Trạng thái là bắt buộc")]
-        public string Status { get; set; } = string.Empty;
     }
 }
