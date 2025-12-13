@@ -50,9 +50,8 @@ namespace Quanlicuahang.Repositories
         public async Task<PromotionDetailDTO?> GetPromotionDetailByIdAsync(string id)
         {
             var promotion = await _context.Promotions
-                .Include(p => p.Orders)
-                .Where(p => p.IsDeleted == false)
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .Where(p => p.IsDeleted == false && p.Id == id)
+                .FirstOrDefaultAsync();
             if (promotion == null) return null;
 
             var createdByEntity = string.IsNullOrWhiteSpace(promotion.CreatedBy)
@@ -65,6 +64,12 @@ namespace Quanlicuahang.Repositories
             var createdByUser = MapUser(createdByEntity);
             var updatedByUser = MapUser(updatedByEntity);
 
+            // Load only required order data to avoid missing column issues
+            var orders = await _context.Orders
+                .Where(o => o.PromoId == id)
+                .Select(o => new OrderDto { Id = o.Id, TotalAmount = o.TotalAmount })
+                .ToListAsync();
+
             var dto = new PromotionDetailDTO
             {
                 Id = promotion.Id,
@@ -75,15 +80,17 @@ namespace Quanlicuahang.Repositories
                 StartDate = promotion.StartDate,
                 EndDate = promotion.EndDate,
                 MinOrderAmount = promotion.MinOrderAmount,
+                MaxDiscount = promotion.MaxDiscount,
                 UsageLimit = promotion.UsageLimit,
                 UsedCount = promotion.UsedCount,
                 Status = promotion.Status,
+                ComputedStatus = promotion.GetComputedStatus(),
                 IsDeleted = promotion.IsDeleted,
                 CreatedAt = promotion.CreatedAt,
                 UpdatedAt = promotion.UpdatedAt,
                 CreatedBy = createdByUser ?? new UserDto(),
                 UpdatedBy = updatedByUser ?? new UserDto(),
-                Orders = promotion.Orders?.Select(o => new OrderDto { Id = o.Id, TotalAmount = o.TotalAmount }).ToList() ?? new List<OrderDto>()
+                Orders = orders
             };
             return dto;
         }

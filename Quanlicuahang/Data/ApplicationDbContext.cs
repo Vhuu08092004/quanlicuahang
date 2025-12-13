@@ -1331,13 +1331,15 @@ namespace Quanlicuahang.Data
 
             // Seed Promotions
             modelBuilder.Entity<Promotion>().HasData(
+                // Khuyến mãi đang diễn ra - Percent với giảm tối đa
                 new Promotion
                 {
                     Id = promo1Id,
                     Code = "KM001",
-                    Description = "Giảm 10% cho đơn hàng từ 200,000đ",
+                    Description = "Giảm 10% cho đơn hàng từ 200,000đ (tối đa 50,000đ)",
                     DiscountType = "percent",
                     DiscountValue = 10m,
+                    MaxDiscount = 50000m,
                     StartDate = now.AddDays(-10),
                     EndDate = now.AddDays(20),
                     MinOrderAmount = 200000m,
@@ -1350,6 +1352,7 @@ namespace Quanlicuahang.Data
                     UpdatedBy = "System",
                     IsDeleted = false
                 },
+                // Khuyến mãi đang diễn ra - Fixed
                 new Promotion
                 {
                     Id = promo2Id,
@@ -1357,10 +1360,95 @@ namespace Quanlicuahang.Data
                     Description = "Giảm 50,000đ cho đơn hàng từ 500,000đ",
                     DiscountType = "fixed",
                     DiscountValue = 50000m,
+                    MaxDiscount = 0m,
                     StartDate = now.AddDays(-5),
                     EndDate = now.AddDays(25),
                     MinOrderAmount = 500000m,
                     UsageLimit = 50,
+                    UsedCount = 0,
+                    Status = "active",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                // Khuyến mãi chờ diễn ra (upcoming)
+                new Promotion
+                {
+                    Id = GenerateCode("promo"),
+                    Code = "KM003",
+                    Description = "Giảm 15% cho đơn hàng từ 300,000đ (tối đa 100,000đ)",
+                    DiscountType = "percent",
+                    DiscountValue = 15m,
+                    MaxDiscount = 100000m,
+                    StartDate = now.AddDays(5),
+                    EndDate = now.AddDays(35),
+                    MinOrderAmount = 300000m,
+                    UsageLimit = 200,
+                    UsedCount = 0,
+                    Status = "active",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                // Khuyến mãi tạm dừng (paused)
+                new Promotion
+                {
+                    Id = GenerateCode("promo"),
+                    Code = "KM004",
+                    Description = "Giảm 20% cho đơn hàng từ 400,000đ (tối đa 150,000đ)",
+                    DiscountType = "percent",
+                    DiscountValue = 20m,
+                    MaxDiscount = 150000m,
+                    StartDate = now.AddDays(-3),
+                    EndDate = now.AddDays(15),
+                    MinOrderAmount = 400000m,
+                    UsageLimit = 80,
+                    UsedCount = 0,
+                    Status = "inactive",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                // Khuyến mãi đã kết thúc (expired)
+                new Promotion
+                {
+                    Id = GenerateCode("promo"),
+                    Code = "KM005",
+                    Description = "Giảm 100,000đ cho đơn hàng từ 1,000,000đ",
+                    DiscountType = "fixed",
+                    DiscountValue = 100000m,
+                    MaxDiscount = 0m,
+                    StartDate = now.AddDays(-30),
+                    EndDate = now.AddDays(-5),
+                    MinOrderAmount = 1000000m,
+                    UsageLimit = 30,
+                    UsedCount = 25,
+                    Status = "active",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                // Khuyến mãi percent không giới hạn giảm tối đa
+                new Promotion
+                {
+                    Id = GenerateCode("promo"),
+                    Code = "KM006",
+                    Description = "Giảm 5% không giới hạn cho mọi đơn hàng",
+                    DiscountType = "percent",
+                    DiscountValue = 5m,
+                    MaxDiscount = 0m,
+                    StartDate = now.AddDays(-15),
+                    EndDate = now.AddDays(45),
+                    MinOrderAmount = 0m,
+                    UsageLimit = 0,
                     UsedCount = 0,
                     Status = "active",
                     CreatedAt = now,
