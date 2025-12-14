@@ -59,7 +59,6 @@ namespace Quanlicuahang.Exception
 
             /* ORDER & PAYMENT */
             services.AddScoped<IOrderRepository, OrderRepository>();
-            services.AddScoped<IInventoryRepository, InventoryRepository>();
             services.AddScoped<IStockEntryRepository, StockEntryRepository>();
             services.AddScoped<IStockEntryService, StockEntryService>();
             services.AddScoped<IOrderService, OrderService>();
@@ -67,8 +66,6 @@ namespace Quanlicuahang.Exception
             services.AddScoped<IPaymentService, PaymentService>();
 
             /* WAREHOUSE */
-            services.AddScoped<IWarehouseRepository, WarehouseRepository>();
-            services.AddScoped<IWarehouseService, WarehouseService>();
             services.AddScoped<IWarehouseAreaRepository, WarehouseAreaRepository>();
             services.AddScoped<IWarehouseAreaService, WarehouseAreaService>();
             services.AddScoped<IAreaInventoryRepository, AreaInventoryRepository>();

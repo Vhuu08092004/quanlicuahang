@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.Models;
+using Quanlicuahang.Enum;
 
 namespace Quanlicuahang.Data
 {
@@ -19,7 +20,6 @@ namespace Quanlicuahang.Data
         public DbSet<ProductAttributeValue> ProductAttributeValues { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<Supplier> Suppliers { get; set; }
-        public DbSet<Inventory> Inventories { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Customer> Customers { get; set; }
@@ -28,11 +28,8 @@ namespace Quanlicuahang.Data
         public DbSet<ActionLog> ActionLogs { get; set; }
         public DbSet<StockEntry> StockEntries { get; set; }
         public DbSet<StockEntryItem> StockEntryItems { get; set; }
-        public DbSet<StockExit> StockExits { get; set; }
-        public DbSet<StockExitItem> StockExitItems { get; set; }
         public DbSet<Return> Returns { get; set; }
         public DbSet<ReturnItem> ReturnItems { get; set; }
-        public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<WarehouseArea> WarehouseAreas { get; set; }
         public DbSet<AreaInventory> AreaInventories { get; set; }
 
@@ -94,12 +91,6 @@ namespace Quanlicuahang.Data
                 .WithMany(s => s.Products)
                 .HasForeignKey(p => p.SupplierId)
                 .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Inventory>()
-                .HasOne(i => i.Product)
-                .WithMany(p => p.Inventories)
-                .HasForeignKey(i => i.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Customer)
@@ -168,24 +159,6 @@ namespace Quanlicuahang.Data
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
 
-            modelBuilder.Entity<StockExit>()
-                .HasOne(se => se.User)
-                .WithMany(u => u.StockExits)
-                .HasForeignKey(se => se.UserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<StockExitItem>()
-                .HasOne(sei => sei.StockExit)
-                .WithMany(se => se.StockExitItems)
-                .HasForeignKey(sei => sei.StockExitId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<StockExitItem>()
-                .HasOne(sei => sei.Product)
-                .WithMany(p => p.StockExitItems)
-                .HasForeignKey(sei => sei.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             modelBuilder.Entity<Return>()
                 .HasOne(r => r.Order)
                 .WithMany()
@@ -209,13 +182,6 @@ namespace Quanlicuahang.Data
                 .WithMany(p => p.ReturnItems)
                 .HasForeignKey(ri => ri.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<WarehouseArea>()
-                .HasOne(wa => wa.Warehouse)
-                .WithMany(w => w.Areas)
-                .HasForeignKey(wa => wa.WarehouseId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .IsRequired(false);
 
             modelBuilder.Entity<AreaInventory>()
                 .HasOne(ai => ai.WarehouseArea)
@@ -701,7 +667,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012341",
                     Price = 10000m,
                     Unit = "lon",
-                    Quantity = 500,
                     CategoryId = cat1Id,
                     SupplierId = sup1Id,
                     CreatedAt = now,
@@ -718,7 +683,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012358",
                     Price = 10000m,
                     Unit = "lon",
-                    Quantity = 450,
                     CategoryId = cat1Id,
                     SupplierId = sup1Id,
                     CreatedAt = now,
@@ -735,7 +699,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012365",
                     Price = 5000m,
                     Unit = "chai",
-                    Quantity = 1000,
                     CategoryId = cat1Id,
                     SupplierId = sup1Id,
                     CreatedAt = now,
@@ -753,7 +716,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012372",
                     Price = 12000m,
                     Unit = "gói",
-                    Quantity = 300,
                     CategoryId = cat2Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -770,7 +732,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012389",
                     Price = 45000m,
                     Unit = "hộp",
-                    Quantity = 150,
                     CategoryId = cat2Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -787,7 +748,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012396",
                     Price = 15000m,
                     Unit = "gói",
-                    Quantity = 200,
                     CategoryId = cat2Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -805,7 +765,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012402",
                     Price = 35000m,
                     Unit = "hộp",
-                    Quantity = 200,
                     CategoryId = cat4Id,
                     SupplierId = sup3Id,
                     CreatedAt = now,
@@ -822,7 +781,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012419",
                     Price = 20000m,
                     Unit = "lốc",
-                    Quantity = 150,
                     CategoryId = cat4Id,
                     SupplierId = sup3Id,
                     CreatedAt = now,
@@ -840,7 +798,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012426",
                     Price = 28000m,
                     Unit = "tuýp",
-                    Quantity = 100,
                     CategoryId = cat5Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -857,7 +814,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012433",
                     Price = 120000m,
                     Unit = "chai",
-                    Quantity = 80,
                     CategoryId = cat5Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -875,7 +831,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012440",
                     Price = 20000m,
                     Unit = "lốc",
-                    Quantity = 400,
                     CategoryId = cat6Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -892,7 +847,6 @@ namespace Quanlicuahang.Data
                     Barcode = "8934588012457",
                     Price = 45000m,
                     Unit = "chai",
-                    Quantity = 120,
                     CategoryId = cat6Id,
                     SupplierId = sup2Id,
                     CreatedAt = now,
@@ -1181,154 +1135,6 @@ namespace Quanlicuahang.Data
                 }
             );
 
-            // Seed Inventories
-            modelBuilder.Entity<Inventory>().HasData(
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV001",
-                    ProductId = prod1Id,
-                    Quantity = 500,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV002",
-                    ProductId = prod2Id,
-                    Quantity = 450,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV003",
-                    ProductId = prod3Id,
-                    Quantity = 1000,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV004",
-                    ProductId = prod4Id,
-                    Quantity = 300,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV005",
-                    ProductId = prod5Id,
-                    Quantity = 150,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV006",
-                    ProductId = prod6Id,
-                    Quantity = 200,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV007",
-                    ProductId = prod7Id,
-                    Quantity = 200,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV008",
-                    ProductId = prod8Id,
-                    Quantity = 150,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV009",
-                    ProductId = prod9Id,
-                    Quantity = 100,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV010",
-                    ProductId = prod10Id,
-                    Quantity = 80,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV011",
-                    ProductId = prod11Id,
-                    Quantity = 400,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                },
-                new Inventory
-                {
-                    Id = GenerateCode("INV"),
-                    Code = "INV012",
-                    ProductId = prod12Id,
-                    Quantity = 120,
-                    CreatedAt = now,
-                    CreatedBy = "System",
-                    UpdatedAt = now,
-                    UpdatedBy = "System",
-                    IsDeleted = false
-                }
-            );
-
             // Seed Promotions
             modelBuilder.Entity<Promotion>().HasData(
                 // Khuyến mãi đang diễn ra - Percent với giảm tối đa
@@ -1458,6 +1264,442 @@ namespace Quanlicuahang.Data
                     IsDeleted = false
                 }
             );
+
+            // Seed WarehouseAreas
+            var wa1Id = GenerateSeedId("WA", 1);
+            var wa2Id = GenerateSeedId("WA", 2);
+            var wa3Id = GenerateSeedId("WA", 3);
+
+            modelBuilder.Entity<WarehouseArea>().HasData(
+                new WarehouseArea
+                {
+                    Id = wa1Id,
+                    Code = "KVA001",
+                    Name = "Khu vực A",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new WarehouseArea
+                {
+                    Id = wa2Id,
+                    Code = "KVB001",
+                    Name = "Khu vực B",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new WarehouseArea
+                {
+                    Id = wa3Id,
+                    Code = "KVC001",
+                    Name = "Khu vực C",
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed AreaInventories
+            modelBuilder.Entity<AreaInventory>().HasData(
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 1),
+                    WarehouseAreaId = wa1Id,
+                    ProductId = prod1Id,
+                    Quantity = 500,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 2),
+                    WarehouseAreaId = wa1Id,
+                    ProductId = prod2Id,
+                    Quantity = 450,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 3),
+                    WarehouseAreaId = wa1Id,
+                    ProductId = prod3Id,
+                    Quantity = 1000,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 4),
+                    WarehouseAreaId = wa2Id,
+                    ProductId = prod4Id,
+                    Quantity = 300,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 5),
+                    WarehouseAreaId = wa2Id,
+                    ProductId = prod5Id,
+                    Quantity = 150,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 6),
+                    WarehouseAreaId = wa2Id,
+                    ProductId = prod6Id,
+                    Quantity = 200,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 7),
+                    WarehouseAreaId = wa3Id,
+                    ProductId = prod7Id,
+                    Quantity = 200,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new AreaInventory
+                {
+                    Id = GenerateSeedId("AI", 8),
+                    WarehouseAreaId = wa3Id,
+                    ProductId = prod8Id,
+                    Quantity = 150,
+                    CreatedAt = now,
+                    CreatedBy = "System",
+                    UpdatedAt = now,
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed StockEntries
+            var se1Id = GenerateSeedId("SE", 1);
+            var se2Id = GenerateSeedId("SE", 2);
+
+            modelBuilder.Entity<StockEntry>().HasData(
+                new StockEntry
+                {
+                    Id = se1Id,
+                    Code = "PN001",
+                    SupplierId = sup1Id,
+                    EntryDate = now.AddDays(-5),
+                    Status = "completed",
+                    TotalCost = 5000000m,
+                    Note = "Nhập hàng đầu tháng",
+                    UserId = stockUserId,
+                    CreatedAt = now.AddDays(-5),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-5),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntry
+                {
+                    Id = se2Id,
+                    Code = "PN002",
+                    SupplierId = sup2Id,
+                    EntryDate = now.AddDays(-2),
+                    Status = "completed",
+                    TotalCost = 3000000m,
+                    Note = "Nhập hàng snack và bánh kẹo",
+                    UserId = stockUserId,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed StockEntryItems
+            modelBuilder.Entity<StockEntryItem>().HasData(
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 1),
+                    StockEntryId = se1Id,
+                    ProductId = prod1Id,
+                    Quantity = 500,
+                    UnitCost = 8000m,
+                    Subtotal = 4000000m,
+                    WarehouseAreaId = wa1Id,
+                    CreatedAt = now.AddDays(-5),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-5),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 2),
+                    StockEntryId = se1Id,
+                    ProductId = prod2Id,
+                    Quantity = 450,
+                    UnitCost = 8000m,
+                    Subtotal = 3600000m,
+                    WarehouseAreaId = wa1Id,
+                    CreatedAt = now.AddDays(-5),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-5),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 3),
+                    StockEntryId = se2Id,
+                    ProductId = prod4Id,
+                    Quantity = 300,
+                    UnitCost = 10000m,
+                    Subtotal = 3000000m,
+                    WarehouseAreaId = wa2Id,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed Orders
+            var order1Id = GenerateSeedId("ORD", 1);
+            var order2Id = GenerateSeedId("ORD", 2);
+            var order3Id = GenerateSeedId("ORD", 3);
+
+            modelBuilder.Entity<Order>().HasData(
+                new Order
+                {
+                    Id = order1Id,
+                    Code = "DH001",
+                    CustomerId = cust2Id,
+                    UserId = cashier1UserId,
+                    PromoId = promo1Id,
+                    OrderDate = now.AddDays(-3),
+                    Status = OrderStatus.Paid,
+                    TotalAmount = 150000m,
+                    DiscountAmount = 15000m,
+                    PaidAmount = 135000m,
+                    Info = null,
+                    CreatedAt = now.AddDays(-3),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-3),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new Order
+                {
+                    Id = order2Id,
+                    Code = "DH002",
+                    CustomerId = cust3Id,
+                    UserId = cashier1UserId,
+                    PromoId = null,
+                    OrderDate = now.AddDays(-1),
+                    Status = OrderStatus.Confirmed,
+                    TotalAmount = 85000m,
+                    DiscountAmount = 0m,
+                    PaidAmount = 0m,
+                    Info = null,
+                    CreatedAt = now.AddDays(-1),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-1),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new Order
+                {
+                    Id = order3Id,
+                    Code = "DH003",
+                    CustomerId = cust1Id,
+                    UserId = cashier1UserId,
+                    PromoId = null,
+                    OrderDate = now.AddHours(-2),
+                    Status = OrderStatus.Pending,
+                    TotalAmount = 45000m,
+                    DiscountAmount = 0m,
+                    PaidAmount = 0m,
+                    Info = null,
+                    CreatedAt = now.AddHours(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddHours(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed OrderItems
+            modelBuilder.Entity<OrderItem>().HasData(
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 1),
+                    OrderId = order1Id,
+                    ProductId = prod1Id,
+                    Quantity = 10,
+                    Price = 10000m,
+                    Subtotal = 100000m,
+                    CreatedAt = now.AddDays(-3),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-3),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 2),
+                    OrderId = order1Id,
+                    ProductId = prod3Id,
+                    Quantity = 10,
+                    Price = 5000m,
+                    Subtotal = 50000m,
+                    CreatedAt = now.AddDays(-3),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-3),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 3),
+                    OrderId = order2Id,
+                    ProductId = prod4Id,
+                    Quantity = 5,
+                    Price = 12000m,
+                    Subtotal = 60000m,
+                    CreatedAt = now.AddDays(-1),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-1),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 4),
+                    OrderId = order2Id,
+                    ProductId = prod6Id,
+                    Quantity = 1,
+                    Price = 15000m,
+                    Subtotal = 15000m,
+                    CreatedAt = now.AddDays(-1),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-1),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 5),
+                    OrderId = order2Id,
+                    ProductId = prod8Id,
+                    Quantity = 1,
+                    Price = 20000m,
+                    Subtotal = 20000m,
+                    CreatedAt = now.AddDays(-1),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-1),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 6),
+                    OrderId = order3Id,
+                    ProductId = prod2Id,
+                    Quantity = 3,
+                    Price = 10000m,
+                    Subtotal = 30000m,
+                    CreatedAt = now.AddHours(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddHours(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new OrderItem
+                {
+                    Id = GenerateSeedId("OI", 7),
+                    OrderId = order3Id,
+                    ProductId = prod3Id,
+                    Quantity = 3,
+                    Price = 5000m,
+                    Subtotal = 15000m,
+                    CreatedAt = now.AddHours(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddHours(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
+
+            // Seed Payments
+            modelBuilder.Entity<Payment>().HasData(
+                new Payment
+                {
+                    Id = GenerateSeedId("PAY", 1),
+                    Code = "TT001",
+                    OrderId = order1Id,
+                    Amount = 135000m,
+                    PaymentMethod = PaymentMethod.Cash,
+                    PaymentStatus = PaymentStatus.Completed,
+                    PaymentDate = now.AddDays(-3),
+                    TransactionRef = null,
+                    Note = "Thanh toán tiền mặt",
+                    IsAutoGenerated = false,
+                    CreatedAt = now.AddDays(-3),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-3),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new Payment
+                {
+                    Id = GenerateSeedId("PAY", 2),
+                    Code = "TT002",
+                    OrderId = order2Id,
+                    Amount = 50000m,
+                    PaymentMethod = PaymentMethod.BankTransfer,
+                    PaymentStatus = PaymentStatus.Pending,
+                    PaymentDate = now.AddDays(-1),
+                    TransactionRef = "TRF20251213001",
+                    Note = "Chuyển khoản ngân hàng",
+                    IsAutoGenerated = false,
+                    CreatedAt = now.AddDays(-1),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-1),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                }
+            );
         }
 
         private static string GenerateCode(string prefix)
@@ -1465,6 +1707,14 @@ namespace Quanlicuahang.Data
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var randomPart = Guid.NewGuid().ToString("N").Substring(0, 8);
             return $"{prefix.ToLower()}-{timestamp}-{randomPart}";
+        }
+
+        private static string GenerateSeedId(string prefix, int seedNumber)
+        {
+            // Sử dụng timestamp cố định cho seed data và randomPart dựa trên seedNumber
+            var baseTimestamp = 1734172800000; // Timestamp cố định cho seed data
+            var randomPart = seedNumber.ToString("X8").ToLower().PadLeft(8, '0');
+            return $"{prefix.ToLower()}-{baseTimestamp}-{randomPart}";
         }
 
         private static string HashPassword(string password)
