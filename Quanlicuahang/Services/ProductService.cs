@@ -99,9 +99,8 @@ namespace Quanlicuahang.Services
                     Barcode = p.Barcode,
                     Price = p.Price,
                     Unit = p.Unit,
-                    Quantity = p.Quantity,
+                    Quantity = 0,
                     ImageUrl = p.ImageUrl,
-
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
                     SupplierId = p.SupplierId,
@@ -128,7 +127,7 @@ namespace Quanlicuahang.Services
                 .Include(p => p.AttributeValues)
                     .ThenInclude(av => av.Attribute)
                 .Where(p => p.Id == id)
-                .Select(p => new ProductDto
+                .Select(p => new
                 {
                     Id = p.Id,
                     Code = p.Code,
@@ -136,7 +135,6 @@ namespace Quanlicuahang.Services
                     Barcode = p.Barcode,
                     Price = p.Price,
                     Unit = p.Unit,
-                    Quantity = p.Quantity,
                     ImageUrl = p.ImageUrl,
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
@@ -167,7 +165,27 @@ namespace Quanlicuahang.Services
                 })
                 .FirstOrDefaultAsync();
 
-            return product;
+            if (product == null) return null;
+
+            return new ProductDto
+            {
+                Id = product.Id,
+                Code = product.Code,
+                Name = product.Name,
+                Barcode = product.Barcode,
+                Price = product.Price,
+                Unit = product.Unit,
+                Quantity = 0,
+                ImageUrl = product.ImageUrl,
+                CategoryId = product.CategoryId,
+                CategoryName = product.CategoryName,
+                SupplierId = product.SupplierId,
+                SupplierName = product.SupplierName,
+                Attributes = product.Attributes,
+                IsDeleted = product.IsDeleted,
+                CreatedAt = product.CreatedAt,
+                UpdatedAt = product.UpdatedAt
+            };
         }
 
         public async Task<ProductDto> CreateAsync(ProductCreateUpdateDto dto)
@@ -489,7 +507,7 @@ namespace Quanlicuahang.Services
                     Id = p.Id,
                     Code = p.Code,
                     Name = p.Name,
-                    Quantity = p.Quantity
+                    Quantity = 0
                 });
 
             var data = await query.ToListAsync();

@@ -22,7 +22,6 @@ namespace Quanlicuahang.Services
     public class OrderService : IOrderService
     {
         private readonly IOrderRepository _orderRepo;
-        private readonly IInventoryRepository _inventoryRepo;
         private readonly IProductRepository _productRepo;
         private readonly IUserRepository _userRepo;
         private readonly IPaymentRepository _paymentRepo;
@@ -33,7 +32,6 @@ namespace Quanlicuahang.Services
 
         public OrderService(
             IOrderRepository orderRepo,
-            IInventoryRepository inventoryRepo,
             IProductRepository productRepo,
             IUserRepository userRepo,
             IPaymentRepository paymentRepo,
@@ -43,7 +41,6 @@ namespace Quanlicuahang.Services
             IAreaInventoryRepository areaInventoryRepo)
         {
             _orderRepo = orderRepo;
-            _inventoryRepo = inventoryRepo;
             _productRepo = productRepo;
             _userRepo = userRepo;
             _paymentRepo = paymentRepo;
@@ -243,9 +240,14 @@ namespace Quanlicuahang.Services
                 var product = await _productRepo.GetByIdAsync(item.ProductId);
                 if (product == null || product.IsDeleted)
                     throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
-                var available = product.Quantity;
-                if (available < item.Quantity)
-                    throw new System.Exception($"Sản phẩm {item.ProductId} không đủ tồn kho. Còn {available}");
+
+                // Kiểm tra tồn kho từ AreaInventory
+                var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                    .Where(ai => ai.ProductId == item.ProductId)
+                    .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                if (totalAvailable < item.Quantity)
+                    throw new System.Exception($"Sản phẩm {item.ProductId} không đủ tồn kho. Còn {totalAvailable}");
             }
 
             // Validate payment method
@@ -322,24 +324,6 @@ namespace Quanlicuahang.Services
                 .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                 .ToList();
 
-            // Load tất cả products cần update một lần để tránh vấn đề tracking
-            var productIds = grouped.Select(g => g.ProductId).ToList();
-            var products = await _productRepo.GetAll(false)
-                .Where(p => productIds.Contains(p.Id))
-                .ToListAsync();
-
-            var productDict = products.ToDictionary(p => p.Id);
-            foreach (var g in grouped)
-            {
-                if (productDict.TryGetValue(g.ProductId, out var prod))
-                {
-                    prod.Quantity = Math.Max(0, prod.Quantity - g.Qty);
-                    prod.UpdatedBy = validUserId ?? "system";
-                    prod.UpdatedAt = DateTime.UtcNow;
-                    _productRepo.Update(prod);
-                }
-            }
-
             // Trừ số lượng từ AreaInventory (khu vực kho)
             foreach (var g in grouped)
             {
@@ -367,24 +351,6 @@ namespace Quanlicuahang.Services
 
             // Persist order + items
             await _orderRepo.SaveChangesAsync();
-
-            // Create stock-out inventory records
-            foreach (var item in dto.Items)
-            {
-                var stockOut = new Inventory
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Code = GenerateCode("INVOUT"),
-                    ProductId = item.ProductId,
-                    Quantity = -Math.Abs(item.Quantity),
-                    CreatedBy = validUserId ?? "system",
-                    UpdatedBy = validUserId ?? "system",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    IsDeleted = false
-                };
-                await _inventoryRepo.AddAsync(stockOut);
-            }
 
             // Create payment automatically if requested and amount > 0
             if (dto.CreatePayment && netAmount > 0)
@@ -538,35 +504,19 @@ namespace Quanlicuahang.Services
                         .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                         .ToList();
 
-                    // Load tất cả products cần update một lần để tránh vấn đề tracking
-                    var productIds = groups.Select(g => g.ProductId).ToList();
-                    var products = await _productRepo.GetAll(false)
-                        .Where(p => productIds.Contains(p.Id))
-                        .ToListAsync();
-                    var productDict = products.ToDictionary(p => p.Id);
-
+                    // Hoàn lại số lượng vào AreaInventory khi hủy đơn
                     foreach (var g in groups)
                     {
-                        if (productDict.TryGetValue(g.ProductId, out var prod))
-                        {
-                            prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
-                            prod.UpdatedBy = userId;
-                            prod.UpdatedAt = DateTime.UtcNow;
-                            _productRepo.Update(prod);
+                        // Tìm AreaInventory đầu tiên có sản phẩm này để cộng lại
+                        var areaInventory = await _areaInventoryRepo.GetAll(false)
+                            .FirstOrDefaultAsync(ai => ai.ProductId == g.ProductId);
 
-                            var inv = new Inventory
-                            {
-                                Id = Guid.NewGuid().ToString(),
-                                Code = GenerateCode("INVRET"),
-                                ProductId = g.ProductId,
-                                Quantity = Math.Abs(g.Qty),
-                                CreatedBy = userId,
-                                UpdatedBy = userId,
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow,
-                                IsDeleted = false
-                            };
-                            await _inventoryRepo.AddAsync(inv);
+                        if (areaInventory != null)
+                        {
+                            areaInventory.Quantity += Math.Abs(g.Qty);
+                            areaInventory.UpdatedBy = userId;
+                            areaInventory.UpdatedAt = DateTime.UtcNow;
+                            _areaInventoryRepo.Update(areaInventory);
                         }
                     }
                 }
@@ -625,12 +575,6 @@ namespace Quanlicuahang.Services
                 // Điều chỉnh tồn kho theo delta
                 var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
 
-                // Load tất cả products cần update một lần để tránh vấn đề tracking
-                var productsToUpdate = await _productRepo.GetAll(false)
-                    .Where(p => affectedProductIds.Contains(p.Id))
-                    .ToListAsync();
-                var productDict = productsToUpdate.ToDictionary(p => p.Id);
-
                 foreach (var pid in affectedProductIds)
                 {
                     var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
@@ -639,30 +583,16 @@ namespace Quanlicuahang.Services
 
                     if (delta != 0)
                     {
-                        if (!productDict.TryGetValue(pid, out var product))
-                            throw new System.Exception($"Sản phẩm {pid} không tồn tại");
-
-                        if (delta > 0 && product.Quantity < delta)
-                            throw new System.Exception($"Sản phẩm {pid} không đủ tồn kho. Cần thêm {delta}, còn {product.Quantity}");
-
-                        product.Quantity = product.Quantity - delta;
-                        product.UpdatedBy = userId;
-                        product.UpdatedAt = DateTime.UtcNow;
-                        _productRepo.Update(product);
-
-                        var inv = new Inventory
+                        // Kiểm tra tồn kho từ AreaInventory nếu delta > 0
+                        if (delta > 0)
                         {
-                            Id = Guid.NewGuid().ToString(),
-                            Code = GenerateCode("INVADJ"),
-                            ProductId = pid,
-                            Quantity = -delta,
-                            CreatedBy = userId,
-                            UpdatedBy = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow,
-                            IsDeleted = false
-                        };
-                        await _inventoryRepo.AddAsync(inv);
+                            var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                                .Where(ai => ai.ProductId == pid)
+                                .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                            if (totalAvailable < delta)
+                                throw new System.Exception($"Sản phẩm {pid} không đủ tồn kho. Cần thêm {delta}, còn {totalAvailable}");
+                        }
 
                         // Trừ số lượng từ AreaInventory nếu delta > 0 (số lượng mới lớn hơn số lượng cũ)
                         if (delta > 0)
@@ -871,15 +801,14 @@ namespace Quanlicuahang.Services
                     throw new System.Exception($"Sản phẩm '{product.Name}' đã bị vô hiệu hóa");
                 }
 
-                // Kiểm tra tồn kho
-                var inventory = await _inventoryRepo.GetAll()
-                    .Where(i => i.ProductId == item.ProductId && !i.IsDeleted)
-                    .FirstOrDefaultAsync();
+                // Kiểm tra tồn kho từ AreaInventory
+                var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                    .Where(ai => ai.ProductId == item.ProductId)
+                    .SumAsync(ai => (int?)ai.Quantity) ?? 0;
 
-                if (inventory == null || inventory.Quantity < item.Quantity)
+                if (totalAvailable < item.Quantity)
                 {
-                    var available = inventory?.Quantity ?? 0;
-                    throw new System.Exception($"Sản phẩm '{product.Name}' chỉ còn {available} trong kho, không đủ để bán {item.Quantity}");
+                    throw new System.Exception($"Sản phẩm '{product.Name}' chỉ còn {totalAvailable} trong kho, không đủ để bán {item.Quantity}");
                 }
             }
 
@@ -917,13 +846,6 @@ namespace Quanlicuahang.Services
             // Tạo OrderItems và trừ số lượng sản phẩm
             var orderItems = new List<OrderItem>();
 
-            // Load tất cả products cần update một lần để tránh vấn đề tracking
-            var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
-            var products = await _productRepo.GetAll(false)
-                .Where(p => productIds.Contains(p.Id))
-                .ToListAsync();
-            var productDict = products.ToDictionary(p => p.Id);
-
             foreach (var item in dto.Items)
             {
                 var orderItem = new OrderItem
@@ -939,28 +861,6 @@ namespace Quanlicuahang.Services
                     IsDeleted = false
                 };
                 orderItems.Add(orderItem);
-
-                // Trừ số lượng sản phẩm trong bảng Product
-                if (productDict.TryGetValue(item.ProductId, out var product))
-                {
-                    product.Quantity -= item.Quantity;
-                    product.UpdatedAt = DateTime.UtcNow;
-                    product.UpdatedBy = "Mobile App";
-                    _productRepo.Update(product);
-                }
-
-                // Trừ số lượng sản phẩm trong bảng Inventory (nếu có quản lý kho)
-                var inventory = await _inventoryRepo.GetAll()
-                    .Where(i => i.ProductId == item.ProductId && !i.IsDeleted)
-                    .FirstOrDefaultAsync();
-
-                if (inventory != null)
-                {
-                    inventory.Quantity -= item.Quantity;
-                    inventory.UpdatedAt = DateTime.UtcNow;
-                    inventory.UpdatedBy = "Mobile App";
-                    _inventoryRepo.Update(inventory);
-                }
 
                 // Trừ số lượng từ AreaInventory (khu vực kho)
                 var remainingQty = item.Quantity;

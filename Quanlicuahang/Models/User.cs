@@ -32,6 +32,5 @@ namespace Quanlicuahang.Models
         public virtual ICollection<ActionLog> ActionLogs { get; set; } = new List<ActionLog>();
         public virtual ICollection<Return> Returns { get; set; } = new List<Return>();
         public virtual ICollection<StockEntry> StockEntries { get; set; } = new List<StockEntry>();
-        public virtual ICollection<StockExit> StockExits { get; set; } = new List<StockExit>();
     }
 }

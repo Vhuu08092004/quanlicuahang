@@ -10,11 +10,6 @@ public class WarehouseArea : Quanlicuahang.Models.BasePrimary
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    public string? WarehouseId { get; set; }
-
-    [ForeignKey(nameof(WarehouseId))]
-    public virtual Warehouse? Warehouse { get; set; }
-
     public virtual ICollection<AreaInventory> AreaInventories { get; set; } = new List<AreaInventory>();
 }
 

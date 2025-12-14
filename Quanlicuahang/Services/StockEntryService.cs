@@ -19,7 +19,6 @@ namespace Quanlicuahang.Services
     public class StockEntryService : IStockEntryService
     {
         private readonly IStockEntryRepository _stockEntryRepo;
-        private readonly IInventoryRepository _inventoryRepo;
         private readonly IProductRepository _productRepo;
         private readonly IAreaInventoryRepository _areaInventoryRepo;
         private readonly IWarehouseAreaRepository _warehouseAreaRepo;
@@ -31,7 +30,6 @@ namespace Quanlicuahang.Services
 
         public StockEntryService(
             IStockEntryRepository stockEntryRepo,
-            IInventoryRepository inventoryRepo,
             IProductRepository productRepo,
             IAreaInventoryRepository areaInventoryRepo,
             IWarehouseAreaRepository warehouseAreaRepo,
@@ -42,7 +40,6 @@ namespace Quanlicuahang.Services
             ITokenHelper tokenHelper)
         {
             _stockEntryRepo = stockEntryRepo;
-            _inventoryRepo = inventoryRepo;
             _productRepo = productRepo;
             _areaInventoryRepo = areaInventoryRepo;
             _warehouseAreaRepo = warehouseAreaRepo;
@@ -288,48 +285,6 @@ namespace Quanlicuahang.Services
                 }
             }
 
-            var grouped = dto.Items
-                .GroupBy(x => x.ProductId)
-                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-                .ToList();
-
-            // Load tất cả products cần update một lần để tránh vấn đề tracking
-            var productIds = grouped.Select(g => g.ProductId).ToList();
-            var products = await _productRepo.GetAll(false)
-                .Where(p => productIds.Contains(p.Id))
-                .ToListAsync();
-
-            var productDict = products.ToDictionary(p => p.Id);
-            foreach (var g in grouped)
-            {
-                if (productDict.TryGetValue(g.ProductId, out var prod))
-                {
-                    prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
-                    prod.UpdatedBy = validUserId ?? "system";
-                    prod.UpdatedAt = DateTime.UtcNow;
-                    _productRepo.Update(prod);
-                }
-            }
-
-            await _stockEntryRepo.SaveChangesAsync();
-
-            foreach (var item in dto.Items)
-            {
-                var stockIn = new Inventory
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Code = GenerateCode("INVIN"),
-                    ProductId = item.ProductId,
-                    Quantity = Math.Abs(item.Quantity),
-                    CreatedBy = validUserId ?? "system",
-                    UpdatedBy = validUserId ?? "system",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    IsDeleted = false
-                };
-                await _inventoryRepo.AddAsync(stockIn);
-            }
-
             await _stockEntryRepo.SaveChangesAsync();
 
             await _logService.LogAsync(
@@ -386,40 +341,6 @@ namespace Quanlicuahang.Services
                         .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                         .ToList();
 
-                    // Load tất cả products cần update một lần để tránh vấn đề tracking
-                    var productIds = groups.Select(g => g.ProductId).ToList();
-                    var products = await _productRepo.GetAll(false)
-                        .Where(p => productIds.Contains(p.Id))
-                        .ToListAsync();
-                    var productDict = products.ToDictionary(p => p.Id);
-
-                    foreach (var g in groups)
-                    {
-                        if (productDict.TryGetValue(g.ProductId, out var prod))
-                        {
-                            var decrease = Math.Abs(g.Qty);
-                            if (prod.Quantity < decrease)
-                                decrease = prod.Quantity;
-                            prod.Quantity = prod.Quantity - decrease;
-                            prod.UpdatedBy = userId;
-                            prod.UpdatedAt = DateTime.UtcNow;
-                            _productRepo.Update(prod);
-
-                            var inv = new Inventory
-                            {
-                                Id = Guid.NewGuid().ToString(),
-                                Code = GenerateCode("INVREV"),
-                                ProductId = g.ProductId,
-                                Quantity = -Math.Abs(g.Qty),
-                                CreatedBy = userId,
-                                UpdatedBy = userId,
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow,
-                                IsDeleted = false
-                            };
-                            await _inventoryRepo.AddAsync(inv);
-                        }
-                    }
 
                     // Trừ lại quantity từ AreaInventory khi hủy phiếu
                     foreach (var item in entry.StockEntryItems.Where(i => !i.IsDeleted && !string.IsNullOrWhiteSpace(i.WarehouseAreaId)))
@@ -510,12 +431,6 @@ namespace Quanlicuahang.Services
 
                 var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
 
-                // Load tất cả products cần update một lần để tránh vấn đề tracking
-                var productsToUpdate = await _productRepo.GetAll(false)
-                    .Where(p => affectedProductIds.Contains(p.Id))
-                    .ToListAsync();
-                var productDict = productsToUpdate.ToDictionary(p => p.Id);
-
                 foreach (var pid in affectedProductIds)
                 {
                     var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
@@ -524,31 +439,16 @@ namespace Quanlicuahang.Services
 
                     if (delta != 0)
                     {
-                        if (!productDict.TryGetValue(pid, out var product))
-                            throw new System.Exception($"Sản phẩm {pid} không tồn tại");
-
-                        var newStock = product.Quantity + delta;
-                        if (newStock < 0)
-                            throw new System.Exception($"Điều chỉnh tồn kho vượt quá số lượng hiện có cho sản phẩm {pid}");
-
-                        product.Quantity = newStock;
-                        product.UpdatedBy = userId;
-                        product.UpdatedAt = DateTime.UtcNow;
-                        _productRepo.Update(product);
-
-                        var inv = new Inventory
+                        // Kiểm tra tồn kho từ AreaInventory nếu delta < 0 (giảm số lượng)
+                        if (delta < 0)
                         {
-                            Id = Guid.NewGuid().ToString(),
-                            Code = GenerateCode("INVADJ"),
-                            ProductId = pid,
-                            Quantity = delta,
-                            CreatedBy = userId,
-                            UpdatedBy = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow,
-                            IsDeleted = false
-                        };
-                        await _inventoryRepo.AddAsync(inv);
+                            var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                                .Where(ai => ai.ProductId == pid)
+                                .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                            if (totalAvailable < Math.Abs(delta))
+                                throw new System.Exception($"Điều chỉnh tồn kho vượt quá số lượng hiện có cho sản phẩm {pid}");
+                        }
                     }
                 }
 

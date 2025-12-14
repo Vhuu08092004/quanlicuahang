@@ -6,17 +6,6 @@ using Quanlicuahang.Repositories;
 
 namespace Quanlicuahang.Services
 {
-    public interface IWarehouseService
-    {
-        Task<object> GetAllAsync(WarehouseSearchDto searchDto);
-        Task<WarehouseDto?> GetByIdAsync(string id);
-        Task<WarehouseDto> CreateAsync(WarehouseCreateUpdateDto dto);
-        Task<bool> UpdateAsync(string id, WarehouseCreateUpdateDto dto);
-        Task<bool> DeActiveAsync(string id);
-        Task<bool> ActiveAsync(string id);
-        Task<object> GetSelectBoxAsync();
-    }
-
     public interface IWarehouseAreaService
     {
         Task<object> GetAllAsync(WarehouseAreaSearchDto searchDto);
@@ -28,258 +17,24 @@ namespace Quanlicuahang.Services
         Task<object> GetSelectBoxAsync();
     }
 
-    public class WarehouseService : IWarehouseService
-    {
-        private readonly IActionLogService _logService;
-        private readonly IHttpContextAccessor _httpContext;
-        private readonly ITokenHelper _tokenHelper;
-        private readonly IWarehouseRepository _repo;
-
-        public WarehouseService(
-            IActionLogService logService,
-            IHttpContextAccessor httpContext,
-            ITokenHelper tokenHelper,
-            IWarehouseRepository repo
-        )
-        {
-            _logService = logService;
-            _httpContext = httpContext;
-            _tokenHelper = tokenHelper;
-            _repo = repo;
-        }
-
-        public async Task<object> GetAllAsync(WarehouseSearchDto searchDto)
-        {
-            var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
-            var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
-
-            var query = _repo.GetAll(true);
-
-            if (searchDto.Where != null)
-            {
-                var where = searchDto.Where;
-                if (!string.IsNullOrWhiteSpace(where.Code))
-                {
-                    var code = where.Code.Trim().ToLower();
-                    query = query.Where(x => x.Code.ToLower().Contains(code));
-                }
-                if (!string.IsNullOrWhiteSpace(where.Name))
-                {
-                    var name = where.Name.Trim().ToLower();
-                    query = query.Where(x => x.Name.ToLower().Contains(name));
-                }
-                if (!string.IsNullOrWhiteSpace(where.Address))
-                {
-                    var address = where.Address.Trim().ToLower();
-                    query = query.Where(x => x.Address.ToLower().Contains(address));
-                }
-                if (where.IsDeleted.HasValue)
-                {
-                    query = query.Where(x => x.IsDeleted == where.IsDeleted.Value);
-                }
-            }
-
-            var total = await query.CountAsync();
-
-            var data = await query
-                .OrderByDescending(x => x.CreatedAt)
-                .Skip(skip)
-                .Take(take)
-                .Select(x => new WarehouseDto
-                {
-                    Id = x.Id,
-                    Code = x.Code,
-                    Name = x.Name,
-                    Address = x.Address,
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt,
-                    CreatedBy = x.CreatedBy,
-                    UpdatedBy = x.UpdatedBy,
-                    IsDeleted = x.IsDeleted,
-                    isCanView = true,
-                    isCanCreate = true,
-                    isCanEdit = !x.IsDeleted,
-                    isCanDeActive = !x.IsDeleted,
-                    isCanActive = x.IsDeleted
-                })
-                .ToListAsync();
-
-            return new { data, total };
-        }
-
-        public async Task<WarehouseDto?> GetByIdAsync(string id)
-        {
-            return await _repo.GetAll(true)
-                .Where(x => x.Id == id)
-                .Select(x => new WarehouseDto
-                {
-                    Id = x.Id,
-                    Code = x.Code,
-                    Name = x.Name,
-                    Address = x.Address,
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt,
-                    IsDeleted = x.IsDeleted
-                })
-                .FirstOrDefaultAsync();
-        }
-
-        public async Task<WarehouseDto> CreateAsync(WarehouseCreateUpdateDto dto)
-        {
-            if (await _repo.ExistsAsync(x => x.Code == dto.Code && !x.IsDeleted))
-                throw new System.Exception($"Mã kho '{dto.Code}' đã tồn tại!");
-            if (await _repo.ExistsAsync(x => x.Name == dto.Name && !x.IsDeleted))
-                throw new System.Exception($"Tên kho '{dto.Name}' đã tồn tại!");
-
-            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-
-            var entity = new Warehouse
-            {
-                Id = Guid.NewGuid().ToString(),
-                Code = dto.Code,
-                Name = dto.Name,
-                Address = dto.Address,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                CreatedBy = userId,
-                UpdatedBy = userId
-            };
-
-            await _repo.AddAsync(entity);
-            await _repo.SaveChangesAsync();
-
-            await _logService.LogAsync(Guid.NewGuid().ToString(), "Create", "Warehouse", entity.Id,
-                $"Tạo mới kho {entity.Code} - {entity.Name}", null, entity, userId,
-                _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString(),
-                _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString());
-
-            return (await GetByIdAsync(entity.Id))!;
-        }
-
-        public async Task<bool> UpdateAsync(string id, WarehouseCreateUpdateDto dto)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            if (entity == null) throw new System.Exception("Kho không tồn tại!");
-
-            if (!string.Equals(entity.Code, dto.Code, StringComparison.OrdinalIgnoreCase))
-            {
-                var codeExists = await _repo.ExistsAsync(x => x.Code == dto.Code && !x.IsDeleted, excludeId: id);
-                if (codeExists) throw new System.Exception($"Mã kho '{dto.Code}' đã tồn tại!");
-            }
-
-            if (!string.Equals(entity.Name, dto.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                var nameExists = await _repo.ExistsAsync(x => x.Name == dto.Name && !x.IsDeleted, excludeId: id);
-                if (nameExists) throw new System.Exception($"Tên kho '{dto.Name}' đã tồn tại!");
-            }
-
-            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-
-            var oldValue = new { entity.Code, entity.Name, entity.Address };
-            entity.Code = dto.Code;
-            entity.Name = dto.Name;
-            entity.Address = dto.Address;
-            entity.UpdatedAt = DateTime.UtcNow;
-            entity.UpdatedBy = userId;
-            _repo.Update(entity);
-            await _repo.SaveChangesAsync();
-
-            await _logService.LogAsync(Guid.NewGuid().ToString(), "Update", "Warehouse", entity.Id,
-                $"Cập nhật kho {entity.Code} - {entity.Name}", oldValue, entity, userId,
-                _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString(),
-                _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString());
-
-            return true;
-        }
-
-        public async Task<bool> DeActiveAsync(string id)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            if (entity == null) return false;
-
-            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-
-            var oldValue = new { entity.IsDeleted };
-            entity.IsDeleted = true;
-            entity.UpdatedAt = DateTime.UtcNow;
-            entity.UpdatedBy = userId;
-            await _repo.SaveChangesAsync();
-
-            await _logService.LogAsync(Guid.NewGuid().ToString(), "DeActive", "Warehouse", entity.Id,
-                $"Ngưng hoạt động kho {entity.Code} - {entity.Name}", oldValue, new { entity.IsDeleted }, userId,
-                _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString(),
-                _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString());
-
-            return true;
-        }
-
-        public async Task<bool> ActiveAsync(string id)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            if (entity == null) return false;
-
-            var userId = await _tokenHelper.GetUserIdFromTokenAsync();
-            if (string.IsNullOrEmpty(userId))
-                throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
-
-            var oldValue = new { entity.IsDeleted };
-            entity.IsDeleted = false;
-            entity.UpdatedAt = DateTime.UtcNow;
-            entity.UpdatedBy = userId;
-            await _repo.SaveChangesAsync();
-
-            await _logService.LogAsync(Guid.NewGuid().ToString(), "Active", "Warehouse", entity.Id,
-                $"Kích hoạt kho {entity.Code} - {entity.Name}", oldValue, new { entity.IsDeleted }, userId,
-                _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString(),
-                _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString());
-
-            return true;
-        }
-
-        public async Task<object> GetSelectBoxAsync()
-        {
-            var query = _repo.GetAll(false)
-                .OrderBy(x => x.Name)
-                .Select(x => new SelectBoxDto
-                {
-                    Id = x.Id,
-                    Code = x.Code,
-                    Name = x.Name
-                });
-
-            var data = await query.ToListAsync();
-            var total = data.Count;
-            return new { data, total };
-        }
-    }
-
     public class WarehouseAreaService : IWarehouseAreaService
     {
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
         private readonly IWarehouseAreaRepository _repo;
-        private readonly IWarehouseRepository _warehouseRepo;
 
         public WarehouseAreaService(
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper,
-            IWarehouseAreaRepository repo,
-            IWarehouseRepository warehouseRepo
+            IWarehouseAreaRepository repo
         )
         {
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
             _repo = repo;
-            _warehouseRepo = warehouseRepo;
         }
 
         public async Task<object> GetAllAsync(WarehouseAreaSearchDto searchDto)
@@ -287,7 +42,7 @@ namespace Quanlicuahang.Services
             var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
             var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
 
-            IQueryable<WarehouseArea> query = _repo.GetAll(true).Include(x => x.Warehouse);
+            IQueryable<WarehouseArea> query = _repo.GetAll(true);
 
             if (searchDto.Where != null)
             {
@@ -301,11 +56,6 @@ namespace Quanlicuahang.Services
                 {
                     var name = where.Name.Trim().ToLower();
                     query = query.Where(x => x.Name.ToLower().Contains(name));
-                }
-                if (!string.IsNullOrWhiteSpace(where.WarehouseId))
-                {
-                    var wid = where.WarehouseId.Trim();
-                    query = query.Where(x => x.WarehouseId == wid);
                 }
                 if (where.IsDeleted.HasValue)
                 {
@@ -326,8 +76,8 @@ namespace Quanlicuahang.Services
                     Id = x.Id,
                     Code = x.Code,
                     Name = x.Name,
-                    WarehouseId = x.WarehouseId ?? "",
-                    WarehouseName = x.Warehouse != null ? x.Warehouse.Name : null,
+                    WarehouseId = "",
+                    WarehouseName = null,
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt,
                     IsDeleted = x.IsDeleted,
@@ -355,7 +105,6 @@ namespace Quanlicuahang.Services
         public async Task<WarehouseAreaDto?> GetByIdAsync(string id)
         {
             return await _repo.GetAll(true)
-                .Include(x => x.Warehouse)
                 .Include(x => x.AreaInventories)
                     .ThenInclude(ai => ai.Product)
                 .Where(x => x.Id == id)
@@ -364,8 +113,8 @@ namespace Quanlicuahang.Services
                     Id = x.Id,
                     Code = x.Code,
                     Name = x.Name,
-                    WarehouseId = x.WarehouseId ?? "",
-                    WarehouseName = x.Warehouse != null ? x.Warehouse.Name : null,
+                    WarehouseId = "",
+                    WarehouseName = null,
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt,
                     IsDeleted = x.IsDeleted,
@@ -387,13 +136,8 @@ namespace Quanlicuahang.Services
         {
             if (await _repo.ExistsAsync(x => x.Code == dto.Code && !x.IsDeleted))
                 throw new System.Exception($"Mã khu vực '{dto.Code}' đã tồn tại!");
-            if (await _repo.ExistsAsync(x => x.Name == dto.Name && !x.IsDeleted &&
-                (string.IsNullOrEmpty(dto.WarehouseId) ? x.WarehouseId == null : x.WarehouseId == dto.WarehouseId)))
+            if (await _repo.ExistsAsync(x => x.Name == dto.Name && !x.IsDeleted))
                 throw new System.Exception($"Tên khu vực '{dto.Name}' đã tồn tại!");
-
-            if (!string.IsNullOrEmpty(dto.WarehouseId) &&
-                !await _warehouseRepo.ExistsAsync(x => x.Id == dto.WarehouseId && !x.IsDeleted))
-                throw new System.Exception("Kho không hợp lệ!");
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
@@ -404,7 +148,6 @@ namespace Quanlicuahang.Services
                 Id = Guid.NewGuid().ToString(),
                 Code = dto.Code,
                 Name = dto.Name,
-                WarehouseId = dto.WarehouseId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
@@ -433,29 +176,22 @@ namespace Quanlicuahang.Services
                 if (codeExists) throw new System.Exception($"Mã khu vực '{dto.Code}' đã tồn tại!");
             }
 
-            if (!string.Equals(entity.Name, dto.Name, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(entity.WarehouseId ?? "", dto.WarehouseId ?? "", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(entity.Name, dto.Name, StringComparison.OrdinalIgnoreCase))
             {
                 var nameExists = await _repo.ExistsAsync(
-                    x => x.Name == dto.Name && !x.IsDeleted &&
-                    (string.IsNullOrEmpty(dto.WarehouseId) ? x.WarehouseId == null : x.WarehouseId == dto.WarehouseId),
+                    x => x.Name == dto.Name && !x.IsDeleted,
                     excludeId: id
                 );
                 if (nameExists) throw new System.Exception($"Tên khu vực '{dto.Name}' đã tồn tại!");
             }
 
-            if (!string.IsNullOrEmpty(dto.WarehouseId) &&
-                !await _warehouseRepo.ExistsAsync(x => x.Id == dto.WarehouseId && !x.IsDeleted))
-                throw new System.Exception("Kho không hợp lệ!");
-
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
                 throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
 
-            var oldValue = new { entity.Code, entity.Name, entity.WarehouseId };
+            var oldValue = new { entity.Code, entity.Name };
             entity.Code = dto.Code;
             entity.Name = dto.Name;
-            entity.WarehouseId = dto.WarehouseId;
             entity.UpdatedAt = DateTime.UtcNow;
             entity.UpdatedBy = userId;
             _repo.Update(entity);

@@ -17,10 +17,10 @@ namespace Quanlicuahang.Repositories
         Task<object> GetInventoryReportAsync(int skip, int take);
     }
 
-  // Implementation của ReportRepository, lấy thẳng từ DbContext
+    // Implementation của ReportRepository, lấy thẳng từ DbContext
     public class ReportRepository : IReportRepository
     {
-        private readonly ApplicationDbContext _context; 
+        private readonly ApplicationDbContext _context;
 
         public ReportRepository(ApplicationDbContext context)
         {
@@ -53,9 +53,9 @@ namespace Quanlicuahang.Repositories
             // Get returns grouped by date
             var returnsQuery = from o in _context.Orders
                                join r in _context.Returns on o.Id equals r.OrderId
-                                where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
-                                     && o.Status == OrderStatus.Paid
-                                     && o.IsDeleted == false
+                               where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
+                                    && o.Status == OrderStatus.Paid
+                                    && o.IsDeleted == false
                                group r by o.OrderDate.Date into g
                                select new
                                {
@@ -141,7 +141,7 @@ namespace Quanlicuahang.Repositories
             return new { data, total };
         }
 
-         // Báo cáo doanh thu theo năm (theo tháng trong năm)
+        // Báo cáo doanh thu theo năm (theo tháng trong năm)
         public async Task<object> GetRevenueByYearAsync(int year, int skip, int take)
         {
             skip = skip < 0 ? 0 : skip;
@@ -329,12 +329,12 @@ namespace Quanlicuahang.Repositories
             var paymentsQuery = from o in _context.Orders
                                 join c in _context.Customers on o.CustomerId equals c.Id
                                 join p in _context.Payments on o.Id equals p.OrderId
-                                where (fromDate == null || o.OrderDate >= fromDate) 
+                                where (fromDate == null || o.OrderDate >= fromDate)
                                       && (toDate == null || o.OrderDate < realToDate)
                                       && o.Status == OrderStatus.Paid
                                       && o.IsDeleted == false
                                       // Lọc theo khu vực nếu được chỉ định
-                                      && (string.IsNullOrEmpty(normalizedRegion) 
+                                      && (string.IsNullOrEmpty(normalizedRegion)
                                           || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
                                           || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
                                           || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
@@ -352,12 +352,12 @@ namespace Quanlicuahang.Repositories
             var returnsQuery = from o in _context.Orders
                                join c in _context.Customers on o.CustomerId equals c.Id
                                join r in _context.Returns on o.Id equals r.OrderId
-                               where (fromDate == null || o.OrderDate >= fromDate) 
+                               where (fromDate == null || o.OrderDate >= fromDate)
                                      && (toDate == null || o.OrderDate < realToDate)
                                      && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
                                      // Lọc theo khu vực nếu được chỉ định
-                                     && (string.IsNullOrEmpty(normalizedRegion) 
+                                     && (string.IsNullOrEmpty(normalizedRegion)
                                          || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
                                          || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
                                          || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
@@ -373,10 +373,11 @@ namespace Quanlicuahang.Repositories
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p => {
+            var allResults = payments.Select(p =>
+            {
                 var refund = returns.FirstOrDefault(r => r.CustomerId == p.CustomerId)?.TotalRefund ?? 0;
                 var netRevenue = p.TotalPayment - refund;
-                
+
                 return new RevenueByCustomerDto
                 {
                     CustomerName = p.CustomerName,
@@ -404,7 +405,7 @@ namespace Quanlicuahang.Repositories
                             join prod in _context.Products on oi.ProductId equals prod.Id
                             join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
                             from category in categories.DefaultIfEmpty()
-                            where (fromDate == null || o.OrderDate >= fromDate) 
+                            where (fromDate == null || o.OrderDate >= fromDate)
                                   && (toDate == null || o.OrderDate <= toDate)
                                   && o.Status == OrderStatus.Paid
                                   && o.IsDeleted == false
@@ -418,10 +419,10 @@ namespace Quanlicuahang.Repositories
                                 TotalRevenue = g.Sum(x => x.oi.Subtotal)
                             };
 
-            // Query để lấy số lượng tồn kho
-            var inventoryQuery = from inv in _context.Inventories
-                                 where !inv.IsDeleted
-                                 group inv by inv.ProductId into g
+            // Query để lấy số lượng tồn kho từ AreaInventory
+            var inventoryQuery = from ai in _context.AreaInventories
+                                 where !ai.IsDeleted
+                                 group ai by ai.ProductId into g
                                  select new
                                  {
                                      ProductId = g.Key,
@@ -456,18 +457,18 @@ namespace Quanlicuahang.Repositories
             skip = skip < 0 ? 0 : skip;
             take = take <= 0 ? 10 : take;
 
-            // Query để lấy tồn kho với thông tin sản phẩm
-            var inventoryQuery = from inv in _context.Inventories
-                                 join prod in _context.Products on inv.ProductId equals prod.Id
+            // Query để lấy tồn kho với thông tin sản phẩm từ AreaInventory
+            var inventoryQuery = from ai in _context.AreaInventories
+                                 join prod in _context.Products on ai.ProductId equals prod.Id
                                  join cat in _context.Categories on prod.CategoryId equals cat.Id into categories
                                  from category in categories.DefaultIfEmpty()
-                                 where inv.IsDeleted == false && prod.IsDeleted == false
-                                 group new { inv, prod, category } by new 
-                                 { 
-                                     prod.Id, 
-                                     prod.Name, 
+                                 where ai.IsDeleted == false && prod.IsDeleted == false
+                                 group new { ai, prod, category } by new
+                                 {
+                                     prod.Id,
+                                     prod.Name,
                                      prod.Price,
-                                     CategoryName = category != null ? category.Name : "Kh�ng ph�n lo?i" 
+                                     CategoryName = category != null ? category.Name : "Không phân loại"
                                  } into g
                                  select new
                                  {
@@ -475,7 +476,7 @@ namespace Quanlicuahang.Repositories
                                      ProductName = g.Key.Name,
                                      CategoryName = g.Key.CategoryName,
                                      UnitPrice = g.Key.Price,
-                                     Quantity = g.Sum(x => x.inv.Quantity)
+                                     Quantity = g.Sum(x => x.ai.Quantity)
                                  };
 
             // Query để lấy số lượng đã bán (tất cả thời gian)
@@ -493,11 +494,12 @@ namespace Quanlicuahang.Repositories
             var soldProducts = await soldQuery.AsNoTracking().ToListAsync();
 
             // Kết hợp dữ liệu và tính toán trạng thái
-            var allResults = inventories.Select(inv => {
+            var allResults = inventories.Select(inv =>
+            {
                 var soldQty = soldProducts.FirstOrDefault(sp => sp.ProductId == inv.ProductId)?.SoldQuantity ?? 0;
                 var quantity = inv.Quantity;
                 var inventoryValue = quantity * inv.UnitPrice;
-                
+
                 // Xác định trạng thái dựa trên số lượng tồn kho
                 string status;
                 if (quantity == 0)
