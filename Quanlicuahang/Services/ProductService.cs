@@ -484,11 +484,12 @@ namespace Quanlicuahang.Services
         {
             var query = _repo.GetAll(false)
                 .OrderBy(p => p.Name)
-                .Select(p => new SelectBoxDto
+                .Select(p => new
                 {
                     Id = p.Id,
                     Code = p.Code,
-                    Name = p.Name
+                    Name = p.Name,
+                    Quantity = p.Quantity
                 });
 
             var data = await query.ToListAsync();

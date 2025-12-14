@@ -36,12 +36,14 @@ namespace Quanlicuahang.DTOs.StockEntry
         public int Quantity { get; set; }
         [Range(0, double.MaxValue)]
         public decimal UnitCost { get; set; }
-        public string? WarehouseAreaId { get; set; }
+        [Required(ErrorMessage = "Vui lòng chọn khu vực kho")]
+        public string WarehouseAreaId { get; set; } = string.Empty;
     }
 
     public class StockEntryCreateDto
     {
-        public string? SupplierId { get; set; }
+        [Required(ErrorMessage = "Vui lòng chọn nhà cung cấp")]
+        public string SupplierId { get; set; } = string.Empty;
         [Required]
         public List<StockEntryItemCreateDto> Items { get; set; } = new();
         public string? Note { get; set; }

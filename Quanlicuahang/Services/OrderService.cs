@@ -29,6 +29,7 @@ namespace Quanlicuahang.Services
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
+        private readonly IAreaInventoryRepository _areaInventoryRepo;
 
         public OrderService(
             IOrderRepository orderRepo,
@@ -38,7 +39,8 @@ namespace Quanlicuahang.Services
             IPaymentRepository paymentRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
-            ITokenHelper tokenHelper)
+            ITokenHelper tokenHelper,
+            IAreaInventoryRepository areaInventoryRepo)
         {
             _orderRepo = orderRepo;
             _inventoryRepo = inventoryRepo;
@@ -48,6 +50,7 @@ namespace Quanlicuahang.Services
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
+            _areaInventoryRepo = areaInventoryRepo;
         }
 
         public async Task<object> GetAllAsync(OrderSearchDto searchDto)
@@ -101,7 +104,7 @@ namespace Quanlicuahang.Services
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip(skip)
                 .Take(take)
-                .Select(o => new 
+                .Select(o => new
                 {
                     o.Id,
                     o.Code,
@@ -118,8 +121,9 @@ namespace Quanlicuahang.Services
                     o.UserId
                 })
                 .ToListAsync();
-            
-            var data = orders.Select(o => {
+
+            var data = orders.Select(o =>
+            {
                 var dto = new OrderDto
                 {
                     Id = o.Id,
@@ -142,7 +146,7 @@ namespace Quanlicuahang.Services
                     isCanCancel = o.Status == OrderStatus.Pending && !o.IsDeleted,
                     isCanDeliver = (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Paid) && !o.IsDeleted,
                 };
-                
+
                 // Parse Info JSON if no Customer and no User
                 if (string.IsNullOrEmpty(o.CustomerId) && string.IsNullOrEmpty(o.UserId) && !string.IsNullOrEmpty(o.Info))
                 {
@@ -159,7 +163,7 @@ namespace Quanlicuahang.Services
                     }
                     catch { }
                 }
-                
+
                 return dto;
             }).ToList();
 
@@ -199,7 +203,7 @@ namespace Quanlicuahang.Services
                     }).ToList()
                 })
                 .FirstOrDefaultAsync();
-            
+
             // Parse Info JSON if no Customer and no User
             if (order != null && string.IsNullOrEmpty(order.CustomerId) && string.IsNullOrEmpty(order.CreatedByName))
             {
@@ -220,7 +224,7 @@ namespace Quanlicuahang.Services
                     catch { }
                 }
             }
-            
+
             return order;
         }
 
@@ -317,15 +321,47 @@ namespace Quanlicuahang.Services
                 .GroupBy(x => x.ProductId)
                 .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                 .ToList();
+
+            // Load tất cả products cần update một lần để tránh vấn đề tracking
+            var productIds = grouped.Select(g => g.ProductId).ToList();
+            var products = await _productRepo.GetAll(false)
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+
+            var productDict = products.ToDictionary(p => p.Id);
             foreach (var g in grouped)
             {
-                var prod = await _productRepo.GetByIdAsync(g.ProductId);
-                if (prod != null)
+                if (productDict.TryGetValue(g.ProductId, out var prod))
                 {
                     prod.Quantity = Math.Max(0, prod.Quantity - g.Qty);
                     prod.UpdatedBy = validUserId ?? "system";
                     prod.UpdatedAt = DateTime.UtcNow;
                     _productRepo.Update(prod);
+                }
+            }
+
+            // Trừ số lượng từ AreaInventory (khu vực kho)
+            foreach (var g in grouped)
+            {
+                var remainingQty = g.Qty;
+
+                // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
+                var areaInventories = await _areaInventoryRepo.GetAll(false)
+                    .Where(ai => ai.ProductId == g.ProductId && ai.Quantity > 0)
+                    .OrderByDescending(ai => ai.Quantity)
+                    .ToListAsync();
+
+                foreach (var areaInv in areaInventories)
+                {
+                    if (remainingQty <= 0) break;
+
+                    var deductQty = Math.Min(remainingQty, areaInv.Quantity);
+                    areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
+                    areaInv.UpdatedBy = validUserId ?? "system";
+                    areaInv.UpdatedAt = DateTime.UtcNow;
+                    _areaInventoryRepo.Update(areaInv);
+
+                    remainingQty -= deductQty;
                 }
             }
 
@@ -501,10 +537,17 @@ namespace Quanlicuahang.Services
                         .GroupBy(i => i.ProductId)
                         .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                         .ToList();
+
+                    // Load tất cả products cần update một lần để tránh vấn đề tracking
+                    var productIds = groups.Select(g => g.ProductId).ToList();
+                    var products = await _productRepo.GetAll(false)
+                        .Where(p => productIds.Contains(p.Id))
+                        .ToListAsync();
+                    var productDict = products.ToDictionary(p => p.Id);
+
                     foreach (var g in groups)
                     {
-                        var prod = await _productRepo.GetByIdAsync(g.ProductId);
-                        if (prod != null)
+                        if (productDict.TryGetValue(g.ProductId, out var prod))
                         {
                             prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
                             prod.UpdatedBy = userId;
@@ -572,6 +615,7 @@ namespace Quanlicuahang.Services
                 }
 
                 var oldGroups = order.OrderItems
+                    .Where(oi => !oi.IsDeleted)
                     .GroupBy(x => x.ProductId)
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
                 var newGroups = dto.Items
@@ -580,6 +624,13 @@ namespace Quanlicuahang.Services
 
                 // Điều chỉnh tồn kho theo delta
                 var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
+
+                // Load tất cả products cần update một lần để tránh vấn đề tracking
+                var productsToUpdate = await _productRepo.GetAll(false)
+                    .Where(p => affectedProductIds.Contains(p.Id))
+                    .ToListAsync();
+                var productDict = productsToUpdate.ToDictionary(p => p.Id);
+
                 foreach (var pid in affectedProductIds)
                 {
                     var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
@@ -588,8 +639,7 @@ namespace Quanlicuahang.Services
 
                     if (delta != 0)
                     {
-                        var product = await _productRepo.GetByIdAsync(pid);
-                        if (product == null)
+                        if (!productDict.TryGetValue(pid, out var product))
                             throw new System.Exception($"Sản phẩm {pid} không tồn tại");
 
                         if (delta > 0 && product.Quantity < delta)
@@ -613,11 +663,53 @@ namespace Quanlicuahang.Services
                             IsDeleted = false
                         };
                         await _inventoryRepo.AddAsync(inv);
+
+                        // Trừ số lượng từ AreaInventory nếu delta > 0 (số lượng mới lớn hơn số lượng cũ)
+                        if (delta > 0)
+                        {
+                            var remainingQty = delta;
+
+                            // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
+                            var areaInventories = await _areaInventoryRepo.GetAll(false)
+                                .Where(ai => ai.ProductId == pid && ai.Quantity > 0)
+                                .OrderByDescending(ai => ai.Quantity)
+                                .ToListAsync();
+
+                            foreach (var areaInv in areaInventories)
+                            {
+                                if (remainingQty <= 0) break;
+
+                                var deductQty = Math.Min(remainingQty, areaInv.Quantity);
+                                areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
+                                areaInv.UpdatedBy = userId;
+                                areaInv.UpdatedAt = DateTime.UtcNow;
+                                _areaInventoryRepo.Update(areaInv);
+
+                                remainingQty -= deductQty;
+                            }
+                        }
+                        // Nếu delta < 0 (số lượng mới nhỏ hơn số lượng cũ), cần cộng lại vào AreaInventory
+                        else if (delta < 0)
+                        {
+                            var addQty = Math.Abs(delta);
+
+                            // Tìm AreaInventory đầu tiên có sản phẩm này để cộng lại
+                            var areaInventory = await _areaInventoryRepo.GetAll(false)
+                                .FirstOrDefaultAsync(ai => ai.ProductId == pid);
+
+                            if (areaInventory != null)
+                            {
+                                areaInventory.Quantity += addQty;
+                                areaInventory.UpdatedBy = userId;
+                                areaInventory.UpdatedAt = DateTime.UtcNow;
+                                _areaInventoryRepo.Update(areaInventory);
+                            }
+                        }
                     }
                 }
 
-                // Soft-delete toàn bộ items cũ
-                foreach (var oi in order.OrderItems)
+                // Soft-delete toàn bộ items cũ (chỉ các items chưa bị xóa)
+                foreach (var oi in order.OrderItems.Where(oi => !oi.IsDeleted))
                 {
                     oi.IsDeleted = true;
                     oi.UpdatedBy = userId;
@@ -824,6 +916,14 @@ namespace Quanlicuahang.Services
 
             // Tạo OrderItems và trừ số lượng sản phẩm
             var orderItems = new List<OrderItem>();
+
+            // Load tất cả products cần update một lần để tránh vấn đề tracking
+            var productIds = dto.Items.Select(i => i.ProductId).Distinct().ToList();
+            var products = await _productRepo.GetAll(false)
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+            var productDict = products.ToDictionary(p => p.Id);
+
             foreach (var item in dto.Items)
             {
                 var orderItem = new OrderItem
@@ -841,8 +941,7 @@ namespace Quanlicuahang.Services
                 orderItems.Add(orderItem);
 
                 // Trừ số lượng sản phẩm trong bảng Product
-                var product = await _productRepo.GetByIdAsync(item.ProductId);
-                if (product != null)
+                if (productDict.TryGetValue(item.ProductId, out var product))
                 {
                     product.Quantity -= item.Quantity;
                     product.UpdatedAt = DateTime.UtcNow;
@@ -861,6 +960,28 @@ namespace Quanlicuahang.Services
                     inventory.UpdatedAt = DateTime.UtcNow;
                     inventory.UpdatedBy = "Mobile App";
                     _inventoryRepo.Update(inventory);
+                }
+
+                // Trừ số lượng từ AreaInventory (khu vực kho)
+                var remainingQty = item.Quantity;
+
+                // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
+                var areaInventories = await _areaInventoryRepo.GetAll(false)
+                    .Where(ai => ai.ProductId == item.ProductId && ai.Quantity > 0)
+                    .OrderByDescending(ai => ai.Quantity)
+                    .ToListAsync();
+
+                foreach (var areaInv in areaInventories)
+                {
+                    if (remainingQty <= 0) break;
+
+                    var deductQty = Math.Min(remainingQty, areaInv.Quantity);
+                    areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
+                    areaInv.UpdatedBy = "Mobile App";
+                    areaInv.UpdatedAt = DateTime.UtcNow;
+                    _areaInventoryRepo.Update(areaInv);
+
+                    remainingQty -= deductQty;
                 }
             }
 
