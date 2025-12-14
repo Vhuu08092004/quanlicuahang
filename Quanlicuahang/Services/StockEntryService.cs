@@ -23,6 +23,7 @@ namespace Quanlicuahang.Services
         private readonly IProductRepository _productRepo;
         private readonly IAreaInventoryRepository _areaInventoryRepo;
         private readonly IWarehouseAreaRepository _warehouseAreaRepo;
+        private readonly ISupplierRepository _supplierRepo;
         private readonly IUserRepository _userRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
@@ -34,6 +35,7 @@ namespace Quanlicuahang.Services
             IProductRepository productRepo,
             IAreaInventoryRepository areaInventoryRepo,
             IWarehouseAreaRepository warehouseAreaRepo,
+            ISupplierRepository supplierRepo,
             IUserRepository userRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
@@ -44,6 +46,7 @@ namespace Quanlicuahang.Services
             _productRepo = productRepo;
             _areaInventoryRepo = areaInventoryRepo;
             _warehouseAreaRepo = warehouseAreaRepo;
+            _supplierRepo = supplierRepo;
             _userRepo = userRepo;
             _logService = logService;
             _httpContext = httpContext;
@@ -168,6 +171,15 @@ namespace Quanlicuahang.Services
 
         public async Task<StockEntryDto> CreateAsync(StockEntryCreateDto dto)
         {
+            // Kiểm tra nhà cung cấp bắt buộc
+            if (string.IsNullOrWhiteSpace(dto.SupplierId))
+                throw new System.Exception("Vui lòng chọn nhà cung cấp");
+
+            // Kiểm tra nhà cung cấp có tồn tại không
+            var supplier = await _supplierRepo.GetByIdAsync(dto.SupplierId);
+            if (supplier == null || supplier.IsDeleted)
+                throw new System.Exception("Nhà cung cấp không tồn tại hoặc đã bị xóa");
+
             if (dto.Items == null || dto.Items.Count == 0)
                 throw new System.Exception("Phiếu nhập phải có ít nhất một sản phẩm");
 
@@ -181,13 +193,14 @@ namespace Quanlicuahang.Services
                 if (product == null || product.IsDeleted)
                     throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
 
-                // Validate WarehouseAreaId nếu có
-                if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
-                {
-                    var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
-                    if (warehouseArea == null || warehouseArea.IsDeleted)
-                        throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
-                }
+                // Kiểm tra khu vực kho bắt buộc
+                if (string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                    throw new System.Exception($"Vui lòng chọn khu vực kho cho sản phẩm {product.Code ?? product.Name}");
+
+                // Validate WarehouseAreaId
+                var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
+                if (warehouseArea == null || warehouseArea.IsDeleted)
+                    throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
             }
 
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
@@ -279,10 +292,17 @@ namespace Quanlicuahang.Services
                 .GroupBy(x => x.ProductId)
                 .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                 .ToList();
+
+            // Load tất cả products cần update một lần để tránh vấn đề tracking
+            var productIds = grouped.Select(g => g.ProductId).ToList();
+            var products = await _productRepo.GetAll(false)
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+
+            var productDict = products.ToDictionary(p => p.Id);
             foreach (var g in grouped)
             {
-                var prod = await _productRepo.GetByIdAsync(g.ProductId);
-                if (prod != null)
+                if (productDict.TryGetValue(g.ProductId, out var prod))
                 {
                     prod.Quantity = prod.Quantity + Math.Abs(g.Qty);
                     prod.UpdatedBy = validUserId ?? "system";
@@ -365,10 +385,17 @@ namespace Quanlicuahang.Services
                         .GroupBy(i => i.ProductId)
                         .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
                         .ToList();
+
+                    // Load tất cả products cần update một lần để tránh vấn đề tracking
+                    var productIds = groups.Select(g => g.ProductId).ToList();
+                    var products = await _productRepo.GetAll(false)
+                        .Where(p => productIds.Contains(p.Id))
+                        .ToListAsync();
+                    var productDict = products.ToDictionary(p => p.Id);
+
                     foreach (var g in groups)
                     {
-                        var prod = await _productRepo.GetByIdAsync(g.ProductId);
-                        if (prod != null)
+                        if (productDict.TryGetValue(g.ProductId, out var prod))
                         {
                             var decrease = Math.Abs(g.Qty);
                             if (prod.Quantity < decrease)
@@ -435,6 +462,19 @@ namespace Quanlicuahang.Services
             if ((entry.Status ?? "").Trim().ToLower() != "pending")
                 throw new System.Exception("Chỉ cho phép chỉnh sửa khi phiếu đang Pending");
 
+            // Kiểm tra nhà cung cấp nếu được cập nhật
+            if (!string.IsNullOrWhiteSpace(dto.SupplierId))
+            {
+                var supplier = await _supplierRepo.GetByIdAsync(dto.SupplierId);
+                if (supplier == null || supplier.IsDeleted)
+                    throw new System.Exception("Nhà cung cấp không tồn tại hoặc đã bị xóa");
+            }
+            // Nếu không truyền SupplierId nhưng phiếu chưa có SupplierId, bắt buộc phải chọn
+            else if (string.IsNullOrWhiteSpace(entry.SupplierId))
+            {
+                throw new System.Exception("Vui lòng chọn nhà cung cấp");
+            }
+
             if (dto.Items != null)
             {
                 if (dto.Items.Count == 0)
@@ -450,16 +490,18 @@ namespace Quanlicuahang.Services
                     if (product == null || product.IsDeleted)
                         throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
 
-                    // Validate WarehouseAreaId nếu có
-                    if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
-                    {
-                        var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
-                        if (warehouseArea == null || warehouseArea.IsDeleted)
-                            throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
-                    }
+                    // Kiểm tra khu vực kho bắt buộc
+                    if (string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                        throw new System.Exception($"Vui lòng chọn khu vực kho cho sản phẩm {product.Code ?? product.Name}");
+
+                    // Validate WarehouseAreaId
+                    var warehouseArea = await _warehouseAreaRepo.GetByIdAsync(item.WarehouseAreaId);
+                    if (warehouseArea == null || warehouseArea.IsDeleted)
+                        throw new System.Exception($"Khu vực kho không tồn tại hoặc đã bị xóa");
                 }
 
                 var oldGroups = entry.StockEntryItems
+                    .Where(sei => !sei.IsDeleted)
                     .GroupBy(x => x.ProductId)
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
                 var newGroups = dto.Items
@@ -467,6 +509,13 @@ namespace Quanlicuahang.Services
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
 
                 var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
+
+                // Load tất cả products cần update một lần để tránh vấn đề tracking
+                var productsToUpdate = await _productRepo.GetAll(false)
+                    .Where(p => affectedProductIds.Contains(p.Id))
+                    .ToListAsync();
+                var productDict = productsToUpdate.ToDictionary(p => p.Id);
+
                 foreach (var pid in affectedProductIds)
                 {
                     var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
@@ -475,8 +524,7 @@ namespace Quanlicuahang.Services
 
                     if (delta != 0)
                     {
-                        var product = await _productRepo.GetByIdAsync(pid);
-                        if (product == null)
+                        if (!productDict.TryGetValue(pid, out var product))
                             throw new System.Exception($"Sản phẩm {pid} không tồn tại");
 
                         var newStock = product.Quantity + delta;
@@ -504,8 +552,8 @@ namespace Quanlicuahang.Services
                     }
                 }
 
-                // Trừ lại quantity cũ từ AreaInventory trước khi xóa các item cũ
-                foreach (var oldItem in entry.StockEntryItems.Where(x => !string.IsNullOrWhiteSpace(x.WarehouseAreaId)))
+                // Trừ lại quantity cũ từ AreaInventory trước khi xóa các item cũ (chỉ các items chưa bị xóa)
+                foreach (var oldItem in entry.StockEntryItems.Where(x => !x.IsDeleted && !string.IsNullOrWhiteSpace(x.WarehouseAreaId)))
                 {
                     var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
                         .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == oldItem.WarehouseAreaId && ai.ProductId == oldItem.ProductId);
@@ -519,7 +567,8 @@ namespace Quanlicuahang.Services
                     }
                 }
 
-                foreach (var it in entry.StockEntryItems)
+                // Soft-delete toàn bộ items cũ (chỉ các items chưa bị xóa)
+                foreach (var it in entry.StockEntryItems.Where(x => !x.IsDeleted))
                 {
                     it.IsDeleted = true;
                     it.UpdatedBy = userId;
