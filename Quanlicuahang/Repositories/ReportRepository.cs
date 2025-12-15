@@ -414,7 +414,7 @@ namespace Quanlicuahang.Repositories
                 TotalQuantity = sp.TotalQuantity,
                 TotalRevenue = sp.TotalRevenue,
                 StockQuantity = inventories.FirstOrDefault(i => i.ProductId == sp.ProductId)?.StockQuantity ?? 0
-            })
+            }) 
             .OrderByDescending(x => x.TotalQuantity)
             .Take(topN)
             .ToList();
