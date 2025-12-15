@@ -92,6 +92,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddTransient<IEmailService, EmailService>();
 
+// ---------------------- CLOUDINARY SERVICE CONFIG ----------------------
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 
 // ---------------------- APP SERVICES ----------------------
 builder.Services.AddAutoMapper(typeof(Program));

@@ -10,11 +10,13 @@ namespace Quanlicuahang.Controllers
     {
         private readonly IProductService _service;
         private readonly IWebHostEnvironment _env;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public ProductController(IProductService service, IWebHostEnvironment env)
+        public ProductController(IProductService service, IWebHostEnvironment env, ICloudinaryService cloudinaryService)
         {
             _service = service;
             _env = env;
+            _cloudinaryService = cloudinaryService;
         }
 
         [HttpPost("pagination")]
@@ -122,24 +124,15 @@ namespace Quanlicuahang.Controllers
 
             try
             {
-                // Create directory if not exists
-                var uploadsFolder = Path.Combine(_env.ContentRootPath, "assests", "images");
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
+                // Upload to Cloudinary
+                var imageUrl = await _cloudinaryService.UploadImageAsync(file, "products");
+                
+                // Extract public ID from URL for later deletion if needed
+                var uri = new Uri(imageUrl);
+                var segments = uri.AbsolutePath.Split('/');
+                var publicId = string.Join("/", segments.Skip(segments.Length - 2).Take(2)).Replace(".jpg", "").Replace(".png", "").Replace(".jpeg", "").Replace(".gif", "").Replace(".webp", "");
 
-                // Generate unique filename
-                var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                // Save file
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                // Return the relative URL
-                var imageUrl = $"/images/{uniqueFileName}";
-                return Ok(new { imageUrl, fileName = uniqueFileName });
+                return Ok(new { imageUrl, publicId });
             }
             catch (System.Exception ex)
             {
@@ -147,18 +140,18 @@ namespace Quanlicuahang.Controllers
             }
         }
 
-        [HttpDelete("delete-image/{fileName}")]
-        public IActionResult DeleteImage(string fileName)
+        [HttpDelete("delete-image")]
+        public async Task<IActionResult> DeleteImage([FromQuery] string publicId)
         {
+            if (string.IsNullOrEmpty(publicId))
+                return BadRequest("Public ID không hợp lệ");
+
             try
             {
-                var filePath = Path.Combine(_env.ContentRootPath, "assests", "images", fileName);
-                if (System.IO.File.Exists(filePath))
-                {
-                    System.IO.File.Delete(filePath);
+                var result = await _cloudinaryService.DeleteImageAsync(publicId);
+                if (result)
                     return Ok("Xóa hình ảnh thành công");
-                }
-                return NotFound("Không tìm thấy hình ảnh");
+                return NotFound("Không tìm thấy hình ảnh hoặc đã bị xóa");
             }
             catch (System.Exception ex)
             {
