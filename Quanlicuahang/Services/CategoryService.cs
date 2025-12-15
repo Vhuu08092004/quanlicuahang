@@ -87,6 +87,7 @@ namespace Quanlicuahang.Services
                     Code = c.Code,
                     Name = c.Name,
                     Description = c.Description,
+                    ImageUrl = c.ImageUrl,
                     IsDeleted = c.IsDeleted,
                     CreatedAt = c.CreatedAt,
                     UpdatedAt = c.UpdatedAt,
@@ -117,6 +118,7 @@ namespace Quanlicuahang.Services
                     Code = c.Code,
                     Name = c.Name,
                     Description = c.Description,
+                    ImageUrl = c.ImageUrl,
                     CreatedAt = c.CreatedAt,
                     UpdatedAt = c.UpdatedAt,
                     IsDeleted = c.IsDeleted
@@ -149,6 +151,7 @@ namespace Quanlicuahang.Services
                 Code = dto.Code,
                 Name = dto.Name,
                 Description = dto.Description,
+                ImageUrl = dto.ImageUrl,
                 CreatedBy = userId,
                 UpdatedBy = userId,
                 CreatedAt = DateTime.UtcNow,
@@ -210,10 +213,11 @@ namespace Quanlicuahang.Services
             var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
 
-            var oldValue = new { category.Code, category.Name, category.Description };
+            var oldValue = new { category.Code, category.Name, category.Description, category.ImageUrl };
             category.Code = dto.Code;
             category.Name = dto.Name;
             category.Description = dto.Description;
+            category.ImageUrl = dto.ImageUrl;
             category.UpdatedBy = userId;
             category.UpdatedAt = DateTime.UtcNow;
             _repo.Update(category);

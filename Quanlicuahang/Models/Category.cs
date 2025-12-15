@@ -17,6 +17,9 @@ namespace Quanlicuahang.Models
 
         public string Description { get; set; } = string.Empty;
 
+        [MaxLength(500)]
+        public string? ImageUrl { get; set; }
+
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }
