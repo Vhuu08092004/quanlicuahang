@@ -24,10 +24,25 @@ namespace Quanlicuahang.Controllers
             return Ok(result);
         }
 
+        [HttpPost("mobile/pagination")]
+        public async Task<IActionResult> GetAllAsyncWithQuantity([FromBody] ProductSearchDto searchDto)
+        {
+            var result = await _service.GetAllAsyncWithQuantity(searchDto);
+            return Ok(result);
+        }
+
         [HttpGet("find_by_id/{id}")]
         public async Task<IActionResult> GetById(string id)
         {
             var result = await _service.GetByIdAsync(id);
+            if (result == null) return NotFound("Không tìm thấy sản phẩm");
+            return Ok(result);
+        }
+
+        [HttpGet("mobile/find_by_id/{id}")]
+        public async Task<IActionResult> GetByIdAsyncWithQuantity(string id)
+        {
+            var result = await _service.GetByIdAsyncWithQuantity(id);
             if (result == null) return NotFound("Không tìm thấy sản phẩm");
             return Ok(result);
         }
