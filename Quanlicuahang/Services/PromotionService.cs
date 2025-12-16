@@ -125,11 +125,27 @@ namespace Quanlicuahang.Services
                     query = query.Where(p => p.UsedCount <= where.MaxUsedCount.Value);
                 }
 
-                // Filter by Status
+                // Filter by Status - now filtering by ComputedStatus
                 if (!string.IsNullOrWhiteSpace(where.Status))
                 {
                     var status = where.Status.Trim().ToLower();
-                    query = query.Where(p => p.Status.ToLower() == status);
+                    var now = DateTime.UtcNow;
+
+                    switch (status)
+                    {
+                        case "upcoming":
+                            query = query.Where(p => p.Status.ToLower() == "active" && p.StartDate > now);
+                            break;
+                        case "ongoing":
+                            query = query.Where(p => p.Status.ToLower() == "active" && p.StartDate <= now && p.EndDate >= now);
+                            break;
+                        case "paused":
+                            query = query.Where(p => p.Status.ToLower() == "inactive" && p.EndDate >= now);
+                            break;
+                        case "expired":
+                            query = query.Where(p => p.EndDate < now);
+                            break;
+                    }
                 }
 
                 // Filter by IsDeleted

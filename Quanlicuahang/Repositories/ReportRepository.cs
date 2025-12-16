@@ -36,26 +36,25 @@ namespace Quanlicuahang.Repositories
             var startOfDay = date.Date;
             var endOfDay = startOfDay.AddDays(1).AddTicks(-1);
 
-            // Get payments grouped by date
-            var paymentsQuery = from o in _context.Orders
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
-                                      && o.Status == OrderStatus.Paid
-                                      && o.IsDeleted == false
-                                group new { o, p } by o.OrderDate.Date into g
-                                select new
-                                {
-                                    Date = g.Key,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    OrderCount = g.Select(x => x.o.Id).Distinct().Count()
-                                };
-
-            // Get returns grouped by date
-            var returnsQuery = from o in _context.Orders
-                               join r in _context.Returns on o.Id equals r.OrderId
-                               where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
+            // Get orders revenue grouped by date
+            var ordersQuery = from o in _context.Orders
+                              where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
                                     && o.Status == OrderStatus.Paid
                                     && o.IsDeleted == false
+                              group o by o.OrderDate.Date into g
+                              select new
+                              {
+                                  Date = g.Key,
+                                  TotalRevenue = g.Sum(x => x.TotalAmount - x.DiscountAmount),
+                                  OrderCount = g.Count()
+                              };
+
+            // Get returns grouped by date
+            var returnsQuery = from r in _context.Returns
+                               join o in _context.Orders on r.OrderId equals o.Id
+                               where o.OrderDate >= startOfDay && o.OrderDate <= endOfDay
+                                     && o.IsDeleted == false
+                                     && r.IsDeleted == false
                                group r by o.OrderDate.Date into g
                                select new
                                {
@@ -63,17 +62,17 @@ namespace Quanlicuahang.Repositories
                                    TotalRefund = g.Sum(x => x.RefundAmount)
                                };
 
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
+            var orders = await ordersQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p => new RevenueReportDto
+            var allResults = orders.Select(o => new RevenueReportDto
             {
-                Date = p.Date,
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Date == p.Date)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount,
-                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 :
-                    (p.TotalPayment - (returns.FirstOrDefault(r => r.Date == p.Date)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
+                Date = o.Date,
+                TotalRevenue = o.TotalRevenue - (returns.FirstOrDefault(r => r.Date == o.Date)?.TotalRefund ?? 0),
+                OrderCount = o.OrderCount,
+                AvgOrderValue = (float)((o.OrderCount == 0) ? 0 :
+                    (o.TotalRevenue - (returns.FirstOrDefault(r => r.Date == o.Date)?.TotalRefund ?? 0)) / (decimal)o.OrderCount)
             }).ToList();
 
             var total = allResults.Count;
@@ -91,28 +90,27 @@ namespace Quanlicuahang.Repositories
             var startOfMonth = new DateTime(year, month, 1);
             var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1).Date.AddHours(23).AddMinutes(59).AddSeconds(59);
 
-            // Get payments grouped by day
-            var paymentsQuery = from o in _context.Orders
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where o.OrderDate >= startOfMonth && o.OrderDate <= endOfMonth
-                                      && o.Status == OrderStatus.Paid
-                                      && o.IsDeleted == false
-                                group new { o, p } by new { o.OrderDate.Year, o.OrderDate.Month, o.OrderDate.Day } into g
-                                select new
-                                {
-                                    Year = g.Key.Year,
-                                    Month = g.Key.Month,
-                                    Day = g.Key.Day,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    OrderCount = g.Select(x => x.o.Id).Distinct().Count()
-                                };
+            // Get orders revenue grouped by day
+            var ordersQuery = from o in _context.Orders
+                              where o.OrderDate >= startOfMonth && o.OrderDate <= endOfMonth
+                                    && o.Status == OrderStatus.Paid
+                                    && o.IsDeleted == false
+                              group o by new { o.OrderDate.Year, o.OrderDate.Month, o.OrderDate.Day } into g
+                              select new
+                              {
+                                  Year = g.Key.Year,
+                                  Month = g.Key.Month,
+                                  Day = g.Key.Day,
+                                  TotalRevenue = g.Sum(x => x.TotalAmount - x.DiscountAmount),
+                                  OrderCount = g.Count()
+                              };
 
             // Get returns grouped by day
-            var returnsQuery = from o in _context.Orders
-                               join r in _context.Returns on o.Id equals r.OrderId
+            var returnsQuery = from r in _context.Returns
+                               join o in _context.Orders on r.OrderId equals o.Id
                                where o.OrderDate >= startOfMonth && o.OrderDate <= endOfMonth
-                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
+                                     && r.IsDeleted == false
                                group r by new { o.OrderDate.Year, o.OrderDate.Month, o.OrderDate.Day } into g
                                select new
                                {
@@ -122,17 +120,17 @@ namespace Quanlicuahang.Repositories
                                    TotalRefund = g.Sum(x => x.RefundAmount)
                                };
 
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
+            var orders = await ordersQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p => new RevenueReportDto
+            var allResults = orders.Select(o => new RevenueReportDto
             {
-                Date = new DateTime(p.Year, p.Month, p.Day),
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month && r.Day == p.Day)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount,
-                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 :
-                        (p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month && r.Day == p.Day)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
+                Date = new DateTime(o.Year, o.Month, o.Day),
+                TotalRevenue = o.TotalRevenue - (returns.FirstOrDefault(r => r.Year == o.Year && r.Month == o.Month && r.Day == o.Day)?.TotalRefund ?? 0),
+                OrderCount = o.OrderCount,
+                AvgOrderValue = (float)((o.OrderCount == 0) ? 0 :
+                        (o.TotalRevenue - (returns.FirstOrDefault(r => r.Year == o.Year && r.Month == o.Month && r.Day == o.Day)?.TotalRefund ?? 0)) / (decimal)o.OrderCount)
             }).OrderBy(x => x.Date).ToList();
 
             var total = allResults.Count;
@@ -150,27 +148,26 @@ namespace Quanlicuahang.Repositories
             var startOfYear = new DateTime(year, 1, 1);
             var endOfYear = new DateTime(year, 12, 31, 23, 59, 59);
 
-            // Get payments grouped by month
-            var paymentsQuery = from o in _context.Orders
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where o.OrderDate >= startOfYear && o.OrderDate <= endOfYear
-                                      && o.Status == OrderStatus.Paid
-                                      && o.IsDeleted == false
-                                group new { o, p } by new { o.OrderDate.Year, o.OrderDate.Month } into g
-                                select new
-                                {
-                                    Year = g.Key.Year,
-                                    Month = g.Key.Month,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    OrderCount = g.Select(x => x.o.Id).Distinct().Count()
-                                };
+            // Get orders revenue grouped by month
+            var ordersQuery = from o in _context.Orders
+                              where o.OrderDate >= startOfYear && o.OrderDate <= endOfYear
+                                    && o.Status == OrderStatus.Paid
+                                    && o.IsDeleted == false
+                              group o by new { o.OrderDate.Year, o.OrderDate.Month } into g
+                              select new
+                              {
+                                  Year = g.Key.Year,
+                                  Month = g.Key.Month,
+                                  TotalRevenue = g.Sum(x => x.TotalAmount - x.DiscountAmount),
+                                  OrderCount = g.Count()
+                              };
 
             // Get returns grouped by month
-            var returnsQuery = from o in _context.Orders
-                               join r in _context.Returns on o.Id equals r.OrderId
+            var returnsQuery = from r in _context.Returns
+                               join o in _context.Orders on r.OrderId equals o.Id
                                where o.OrderDate >= startOfYear && o.OrderDate <= endOfYear
-                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
+                                     && r.IsDeleted == false
                                group r by new { o.OrderDate.Year, o.OrderDate.Month } into g
                                select new
                                {
@@ -179,16 +176,16 @@ namespace Quanlicuahang.Repositories
                                    TotalRefund = g.Sum(x => x.RefundAmount)
                                };
 
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
+            var orders = await ordersQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p => new RevenueReportDto
+            var allResults = orders.Select(o => new RevenueReportDto
             {
-                Date = new DateTime(p.Year, p.Month, 1), // Ngày đầu tháng
-                TotalRevenue = p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month)?.TotalRefund ?? 0),
-                OrderCount = p.OrderCount,
-                AvgOrderValue = (float)((p.OrderCount == 0) ? 0 : (p.TotalPayment - (returns.FirstOrDefault(r => r.Year == p.Year && r.Month == p.Month)?.TotalRefund ?? 0)) / (decimal)p.OrderCount)
+                Date = new DateTime(o.Year, o.Month, 1), // Ngày đầu tháng
+                TotalRevenue = o.TotalRevenue - (returns.FirstOrDefault(r => r.Year == o.Year && r.Month == o.Month)?.TotalRefund ?? 0),
+                OrderCount = o.OrderCount,
+                AvgOrderValue = (float)((o.OrderCount == 0) ? 0 : (o.TotalRevenue - (returns.FirstOrDefault(r => r.Year == o.Year && r.Month == o.Month)?.TotalRefund ?? 0)) / (decimal)o.OrderCount)
 
 
             }).OrderBy(x => x.Date).ToList();
@@ -205,37 +202,20 @@ namespace Quanlicuahang.Repositories
             take = take <= 0 ? 10 : take;
 
             var realToDate = toDate.HasValue ? toDate.Value.AddDays(1) : (DateTime?)null;
-            // Lấy tất cả nhân viên và tính tổng thanh toán (kể cả không có đơn)
-            var paymentsQuery =
+            
+            // Lấy tất cả nhân viên và tính tổng doanh thu (kể cả không có đơn)
+            var ordersQuery =
                 from e in _context.Employees
-
                 join u in _context.Users on e.Id equals u.EmployeeId into userGroup
                 from u in userGroup.DefaultIfEmpty()
-
                 join o in _context.Orders on u.Id equals o.UserId into orderGroup
                 from o in orderGroup.DefaultIfEmpty()
-
-                join p in _context.Payments on o.Id equals p.OrderId into paymentGroup
-                from p in paymentGroup.DefaultIfEmpty()
-
-                group new { o, p } by new { e.Id, e.Name } into g
+                group new { o } by new { e.Id, e.Name } into g
                 select new
                 {
                     EmployeeId = g.Key.Id,
                     EmployeeName = g.Key.Name,
-
-                    TotalPayment = g
-                        .Where(x =>
-                            x.o != null &&
-                            (fromDate == null || x.o.OrderDate >= fromDate) &&
-                            (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == OrderStatus.Paid &&
-                            !x.o.IsDeleted &&
-                            x.p != null
-                        )
-                        .Sum(x => (decimal?)x.p.Amount) ?? 0,
-
-                    TotalOrderAmount = g
+                    TotalRevenue = g
                         .Where(x =>
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
@@ -243,8 +223,7 @@ namespace Quanlicuahang.Repositories
                             x.o.Status == OrderStatus.Paid &&
                             !x.o.IsDeleted
                         )
-                        .Sum(x => (decimal?)((x.o.TotalAmount) - (x.o.DiscountAmount))) ?? 0,
-
+                        .Sum(x => (decimal?)(x.o.TotalAmount - x.o.DiscountAmount)) ?? 0,
                     OrderCount = g
                         .Where(x =>
                             x.o != null &&
@@ -261,16 +240,12 @@ namespace Quanlicuahang.Repositories
             // Lấy tổng tiền hoàn (returns)
             var returnsQuery =
                 from e in _context.Employees
-
                 join u in _context.Users on e.Id equals u.EmployeeId into userGroup
                 from u in userGroup.DefaultIfEmpty()
-
                 join o in _context.Orders on u.Id equals o.UserId into orderGroup
                 from o in orderGroup.DefaultIfEmpty()
-
                 join r in _context.Returns on o.Id equals r.OrderId into returnGroup
                 from r in returnGroup.DefaultIfEmpty()
-
                 group new { o, r } by new { e.Id, e.Name } into g
                 select new
                 {
@@ -281,27 +256,27 @@ namespace Quanlicuahang.Repositories
                             x.o != null &&
                             (fromDate == null || x.o.OrderDate >= fromDate) &&
                             (toDate == null || x.o.OrderDate < realToDate) &&
-                            x.o.Status == OrderStatus.Paid &&
-                            !x.o.IsDeleted &&
-                            x.r != null
+                            x.o.IsDeleted == false &&
+                            x.r != null &&
+                            x.r.IsDeleted == false
                         )
                         .Sum(x => (decimal?)x.r.RefundAmount) ?? 0
                 };
 
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
+            var orders = await ordersQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Ghép kết quả, đảm bảo mọi nhân viên đều có mặt
             var allResults = (
-                from p in payments
-                join r in returns on p.EmployeeId equals r.EmployeeId into returnGroup
+                from o in orders
+                join r in returns on o.EmployeeId equals r.EmployeeId into returnGroup
                 from r in returnGroup.DefaultIfEmpty()
                 select new RevenueByEmployeeDto
                 {
-                    EmployeeName = p.EmployeeName,
-                    TotalRevenue = p.TotalOrderAmount - (r?.TotalRefund ?? 0),
-                    TotalPayment = p.TotalPayment - (r?.TotalRefund ?? 0),
-                    OrderCount = p.OrderCount
+                    EmployeeName = o.EmployeeName,
+                    TotalRevenue = o.TotalRevenue - (r?.TotalRefund ?? 0),
+                    TotalPayment = o.TotalRevenue - (r?.TotalRefund ?? 0), // TotalPayment = TotalRevenue sau khi trừ refund
+                    OrderCount = o.OrderCount
                 }
             )
             .OrderByDescending(x => x.TotalRevenue)
@@ -325,37 +300,36 @@ namespace Quanlicuahang.Repositories
             // Chuẩn hóa region string để so sánh không phân biệt hoa thường
             var normalizedRegion = region?.Trim().ToLower();
 
-            // Get payments grouped by customer
-            var paymentsQuery = from o in _context.Orders
-                                join c in _context.Customers on o.CustomerId equals c.Id
-                                join p in _context.Payments on o.Id equals p.OrderId
-                                where (fromDate == null || o.OrderDate >= fromDate)
-                                      && (toDate == null || o.OrderDate < realToDate)
-                                      && o.Status == OrderStatus.Paid
-                                      && o.IsDeleted == false
-                                      // Lọc theo khu vực nếu được chỉ định
-                                      && (string.IsNullOrEmpty(normalizedRegion)
-                                          || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
-                                          || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
-                                          || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
-                                group new { o, p, c } by new { c.Id, c.Name, c.Address } into g
-                                select new
-                                {
-                                    CustomerId = g.Key.Id,
-                                    CustomerName = g.Key.Name,
-                                    CustomerAddress = g.Key.Address,
-                                    TotalPayment = g.Sum(x => x.p.Amount),
-                                    OrderCount = g.Select(x => x.o.Id).Distinct().Count()
-                                };
+            // Get orders revenue grouped by customer
+            var ordersQuery = from o in _context.Orders
+                              join c in _context.Customers on o.CustomerId equals c.Id
+                              where (fromDate == null || o.OrderDate >= fromDate)
+                                    && (toDate == null || o.OrderDate < realToDate)
+                                    && o.Status == OrderStatus.Paid
+                                    && o.IsDeleted == false
+                                    // Lọc theo khu vực nếu được chỉ định
+                                    && (string.IsNullOrEmpty(normalizedRegion)
+                                        || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
+                                        || (normalizedRegion == "hồ chí minh" && (c.Address.ToLower().Contains("hồ chí minh") || c.Address.ToLower().Contains("tp.hcm") || c.Address.ToLower().Contains("sài gòn")))
+                                        || (normalizedRegion == "đà nẵng" && c.Address.ToLower().Contains("đà nẵng")))
+                              group new { o, c } by new { c.Id, c.Name, c.Address } into g
+                              select new
+                              {
+                                  CustomerId = g.Key.Id,
+                                  CustomerName = g.Key.Name,
+                                  CustomerAddress = g.Key.Address,
+                                  TotalRevenue = g.Sum(x => x.o.TotalAmount - x.o.DiscountAmount),
+                                  OrderCount = g.Count()
+                              };
 
             // Get returns grouped by customer
-            var returnsQuery = from o in _context.Orders
+            var returnsQuery = from r in _context.Returns
+                               join o in _context.Orders on r.OrderId equals o.Id
                                join c in _context.Customers on o.CustomerId equals c.Id
-                               join r in _context.Returns on o.Id equals r.OrderId
                                where (fromDate == null || o.OrderDate >= fromDate)
                                      && (toDate == null || o.OrderDate < realToDate)
-                                     && o.Status == OrderStatus.Paid
                                      && o.IsDeleted == false
+                                     && r.IsDeleted == false
                                      // Lọc theo khu vực nếu được chỉ định
                                      && (string.IsNullOrEmpty(normalizedRegion)
                                          || (normalizedRegion == "hà nội" && c.Address.ToLower().Contains("hà nội"))
@@ -369,21 +343,21 @@ namespace Quanlicuahang.Repositories
                                    TotalRefund = g.Sum(x => x.r.RefundAmount)
                                };
 
-            var payments = await paymentsQuery.AsNoTracking().ToListAsync();
+            var orders = await ordersQuery.AsNoTracking().ToListAsync();
             var returns = await returnsQuery.AsNoTracking().ToListAsync();
 
             // Combine the results
-            var allResults = payments.Select(p =>
+            var allResults = orders.Select(o =>
             {
-                var refund = returns.FirstOrDefault(r => r.CustomerId == p.CustomerId)?.TotalRefund ?? 0;
-                var netRevenue = p.TotalPayment - refund;
+                var refund = returns.FirstOrDefault(r => r.CustomerId == o.CustomerId)?.TotalRefund ?? 0;
+                var netRevenue = o.TotalRevenue - refund;
 
                 return new RevenueByCustomerDto
                 {
-                    CustomerName = p.CustomerName,
+                    CustomerName = o.CustomerName,
                     TotalRevenue = netRevenue,
-                    OrderCount = p.OrderCount,
-                    AverageOrder = p.OrderCount > 0 ? (float)(netRevenue / p.OrderCount) : 0
+                    OrderCount = o.OrderCount,
+                    AverageOrder = o.OrderCount > 0 ? (float)(netRevenue / o.OrderCount) : 0
                 };
             }).OrderByDescending(x => x.TotalRevenue).ToList();
 
@@ -440,7 +414,7 @@ namespace Quanlicuahang.Repositories
                 TotalQuantity = sp.TotalQuantity,
                 TotalRevenue = sp.TotalRevenue,
                 StockQuantity = inventories.FirstOrDefault(i => i.ProductId == sp.ProductId)?.StockQuantity ?? 0
-            })
+            }) 
             .OrderByDescending(x => x.TotalQuantity)
             .Take(topN)
             .ToList();

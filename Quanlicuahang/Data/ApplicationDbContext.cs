@@ -500,7 +500,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765816490/unnamed_znytbl.jpg"
                 },
                 new Category
                 {
@@ -512,7 +513,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765816752/unnamed_cbpw5s.jpg"
                 },
                 new Category
                 {
@@ -524,7 +526,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765816627/unnamed_fj01em.jpg"
                 },
                 new Category
                 {
@@ -536,7 +539,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765816866/unnamed_wxbn4v.jpg"
                 },
                 new Category
                 {
@@ -548,7 +552,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765816922/unnamed_eftmjd.jpg"
                 },
                 new Category
                 {
@@ -560,7 +565,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817020/unnamed_q8pwc1.jpg"
                 }
             );
 
@@ -673,7 +679,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817527/products/szdbbfgryub3gg3xtaig.jpg"
                 },
                 new Product
                 {
@@ -689,7 +696,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817658/products/wdbiglkrxvyjdybiq7nb.jpg"
                 },
                 new Product
                 {
@@ -705,7 +713,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817921/shopping_gluvav.webp"
                 },
                 // Snack & Bánh kẹo
                 new Product
@@ -722,7 +731,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817708/products/dh4re0ynz4y8i1a4jsxr.jpg"
                 },
                 new Product
                 {
@@ -738,7 +748,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765818143/download_pngmcc.jpg"
                 },
                 new Product
                 {
@@ -754,7 +765,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817746/products/tswtbvoigplzmghemzkf.jpg"
                 },
                 // Sữa
                 new Product
@@ -771,7 +783,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817121/shopping_izs0wf.webp"
                 },
                 new Product
                 {
@@ -787,7 +800,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765818105/shopping_pxhzfl.webp"
                 },
                 // Đồ dùng cá nhân
                 new Product
@@ -804,7 +818,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817614/products/sxythlkgi1hwyftyr7or.avif"
                 },
                 new Product
                 {
@@ -820,7 +835,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765818057/shopping_dhr9ar.webp"
                 },
                 // Gia vị & Mì gói
                 new Product
@@ -837,7 +853,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817818/products/hft2nscbpgamixspoq2f.webp"
                 },
                 new Product
                 {
@@ -853,7 +870,8 @@ namespace Quanlicuahang.Data
                     CreatedBy = "System",
                     UpdatedAt = now,
                     UpdatedBy = "System",
-                    IsDeleted = false
+                    IsDeleted = false,
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817328/products/w5zxv57s6zhzepqos4le.jpg"
                 }
             );
 
