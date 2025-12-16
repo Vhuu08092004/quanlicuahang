@@ -819,7 +819,7 @@ namespace Quanlicuahang.Data
                     UpdatedAt = now,
                     UpdatedBy = "System",
                     IsDeleted = false,
-                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765817614/products/sxythlkgi1hwyftyr7or.avif"
+                    ImageUrl = "https://res.cloudinary.com/dygibgnym/image/upload/v1765872364/67c4282c-42d0-4fb0-b8f9-0647f30b3cf6_jfjr2p.jpg"
                 },
                 new Product
                 {
