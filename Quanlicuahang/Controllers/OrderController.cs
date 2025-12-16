@@ -9,10 +9,12 @@ namespace Quanlicuahang.Controllers
     public class OrderController : ControllerBase
     {
         private readonly IOrderService _service;
+        private readonly IInvoiceSettingService _invoiceSettingService;
 
-        public OrderController(IOrderService service)
+        public OrderController(IOrderService service, IInvoiceSettingService invoiceSettingService)
         {
             _service = service;
+            _invoiceSettingService = invoiceSettingService;
         }
 
         [HttpPost("pagination")]
@@ -118,6 +120,29 @@ namespace Quanlicuahang.Controllers
             }
         }
 
+        [HttpGet("invoice/{id}")]
+        public async Task<IActionResult> ExportInvoicePdf([FromRoute] string id)
+        {
+            try
+            {
+                var order = await _service.GetByIdAsync(id);
+                if (order == null) return NotFound("Không tìm thấy đơn hàng");
+                if (order.IsDeleted) return BadRequest("Đơn hàng đã bị xóa");
+
+                if (!string.Equals(order.Status, "Paid", StringComparison.OrdinalIgnoreCase))
+                    return BadRequest("Chỉ xuất hóa đơn khi đơn hàng đã thanh toán (Paid).");
+
+                var invoiceSetting = await _invoiceSettingService.GetAsync();
+                var pdfBytes = OrderInvoicePdf.Generate(order, invoiceSetting);
+                var safeCode = string.IsNullOrWhiteSpace(order.Code) ? id : order.Code;
+                return File(pdfBytes, "application/pdf", $"HoaDon-{safeCode}.pdf");
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         /// <summary>
         /// API đặt hàng từ Mobile App - Không yêu cầu authentication
         /// </summary>
@@ -134,9 +159,10 @@ namespace Quanlicuahang.Controllers
             }
             catch (System.Exception ex)
             {
-                return BadRequest(new { 
-                    success = false, 
-                    message = ex.Message 
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
                 });
             }
         }

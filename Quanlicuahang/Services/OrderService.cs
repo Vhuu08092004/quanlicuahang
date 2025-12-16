@@ -174,6 +174,7 @@ namespace Quanlicuahang.Services
                 .Include(o => o.User)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
+                .Include(o => o.Payments)
                 .Where(o => o.Id == id)
                 .Select(o => new OrderDto
                 {
@@ -197,7 +198,21 @@ namespace Quanlicuahang.Services
                         ProductName = oi.Product != null ? oi.Product.Name : null,
                         Quantity = oi.Quantity,
                         UnitPrice = oi.Price
-                    }).ToList()
+                    }).ToList(),
+                    Payments = o.Payments
+                        .Where(p => !p.IsDeleted)
+                        .OrderBy(p => p.PaymentDate)
+                        .Select(p => new PaymentInfoDto
+                        {
+                            Id = p.Id,
+                            Amount = p.Amount,
+                            PaymentMethod = p.PaymentMethod.ToString(),
+                            PaymentStatus = p.PaymentStatus.ToString(),
+                            PaymentDate = p.PaymentDate,
+                            Note = p.Note,
+                            IsDeleted = p.IsDeleted
+                        })
+                        .ToList()
                 })
                 .FirstOrDefaultAsync();
 
@@ -353,6 +368,7 @@ namespace Quanlicuahang.Services
                         areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
                         areaInv.UpdatedBy = validUserId ?? "system";
                         areaInv.UpdatedAt = DateTime.UtcNow;
+                        if (areaInv.Quantity <= 0) areaInv.IsDeleted = true;
                         _areaInventoryRepo.Update(areaInv);
 
                         remainingQty -= deductQty;
@@ -369,7 +385,8 @@ namespace Quanlicuahang.Services
                 await DeductInventoryAsync();
             }
 
-            // Create payment automatically if requested and amount > 0
+            // Create payment automatically by default if amount > 0
+            // Mặc định tự động tạo phiếu thanh toán khi tạo đơn hàng (CreatePayment mặc định = true)
             if (dto.CreatePayment && netAmount > 0)
             {
                 // Nếu là thanh toán tiền mặt - tạo thanh toán ngay với trạng thái Completed
@@ -510,7 +527,14 @@ namespace Quanlicuahang.Services
             // 1) Cập nhật trạng thái nếu có
             if (!string.IsNullOrWhiteSpace(dto.Status))
             {
-                if (!System.Enum.TryParse<OrderStatus>(dto.Status, true, out var newStatus))
+                // Normalize status string: "canceled" -> "Cancelled"
+                var normalizedStatus = dto.Status.Trim();
+                if (normalizedStatus.Equals("canceled", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedStatus = "Cancelled";
+                }
+                
+                if (!System.Enum.TryParse<OrderStatus>(normalizedStatus, true, out var newStatus))
                     throw new System.Exception($"Trạng thái không hợp lệ: {dto.Status}");
 
                 var currentStatus = order.Status;
@@ -554,10 +578,53 @@ namespace Quanlicuahang.Services
                                 areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
                                 areaInv.UpdatedBy = userId;
                                 areaInv.UpdatedAt = DateTime.UtcNow;
+                                if (areaInv.Quantity <= 0) areaInv.IsDeleted = true;
                                 _areaInventoryRepo.Update(areaInv);
                                 remainingQty -= deductQty;
                             }
                         }
+                    }
+
+                    // Cập nhật trạng thái payment từ Pending sang Completed cho các payment không phải tiền mặt
+                    var pendingPayments = await _paymentRepo.GetAll(false)
+                        .Where(p => p.OrderId == order.Id 
+                            && p.PaymentStatus == PaymentStatus.Pending 
+                            && p.PaymentMethod != PaymentMethod.Cash
+                            && !p.IsDeleted)
+                        .ToListAsync();
+
+                    foreach (var payment in pendingPayments)
+                    {
+                        payment.PaymentStatus = PaymentStatus.Completed;
+                        payment.PaymentDate = DateTime.UtcNow;
+                        payment.UpdatedBy = userId;
+                        payment.UpdatedAt = DateTime.UtcNow;
+                        _paymentRepo.Update(payment);
+
+                        await _logService.LogAsync(
+                            code: Guid.NewGuid().ToString(),
+                            action: "AutoCompletePayment",
+                            entityType: "Payments",
+                            entityId: payment.Id,
+                            description: $"Tự động hoàn thành thanh toán {payment.PaymentMethod} khi đơn hàng chuyển sang Paid",
+                            oldValue: new { PaymentStatus = PaymentStatus.Pending },
+                            newValue: new { PaymentStatus = PaymentStatus.Completed, PaymentDate = payment.PaymentDate },
+                            userId: userId,
+                            ip: ip,
+                            userAgent: agent
+                        );
+                    }
+
+                    if (pendingPayments.Count > 0)
+                    {
+                        await _paymentRepo.SaveChangesAsync();
+                        
+                        // Cập nhật PaidAmount của order sau khi cập nhật payment
+                        var totalPaid = await _paymentRepo.GetAll(false)
+                            .Where(p => p.OrderId == order.Id && p.PaymentStatus == PaymentStatus.Completed && !p.IsDeleted)
+                            .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+                        
+                        order.PaidAmount = totalPaid;
                     }
                 }
                 else if (newStatus == OrderStatus.Cancelled)
@@ -867,6 +934,7 @@ namespace Quanlicuahang.Services
                     areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
                     areaInv.UpdatedBy = "Mobile App";
                     areaInv.UpdatedAt = DateTime.UtcNow;
+                    if (areaInv.Quantity <= 0) areaInv.IsDeleted = true;
                     _areaInventoryRepo.Update(areaInv);
 
                     remainingQty -= deductQty;

@@ -318,6 +318,7 @@ namespace Quanlicuahang.Services
                             existingAreaInventory.Quantity += item.Quantity;
                             existingAreaInventory.UpdatedBy = userId;
                             existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            if (existingAreaInventory.Quantity > 0) existingAreaInventory.IsDeleted = false;
                             _areaInventoryRepo.Update(existingAreaInventory);
                         }
                         else
@@ -354,6 +355,7 @@ namespace Quanlicuahang.Services
                                 existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - item.Quantity);
                                 existingAreaInventory.UpdatedBy = userId;
                                 existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                                if (existingAreaInventory.Quantity <= 0) existingAreaInventory.IsDeleted = true;
                                 _areaInventoryRepo.Update(existingAreaInventory);
                             }
                         }
@@ -470,6 +472,7 @@ namespace Quanlicuahang.Services
                             existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - oldItem.Quantity);
                             existingAreaInventory.UpdatedBy = userId;
                             existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            if (existingAreaInventory.Quantity <= 0) existingAreaInventory.IsDeleted = true;
                             _areaInventoryRepo.Update(existingAreaInventory);
                         }
                     }
@@ -512,6 +515,7 @@ namespace Quanlicuahang.Services
                             existingAreaInventory.Quantity += item.Quantity;
                             existingAreaInventory.UpdatedBy = userId;
                             existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            if (existingAreaInventory.Quantity > 0) existingAreaInventory.IsDeleted = false;
                             _areaInventoryRepo.Update(existingAreaInventory);
                         }
                         else
