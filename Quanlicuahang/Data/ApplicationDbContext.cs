@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Quanlicuahang.Models;
 using Quanlicuahang.Enum;
 
@@ -32,6 +32,7 @@ namespace Quanlicuahang.Data
         public DbSet<ReturnItem> ReturnItems { get; set; }
         public DbSet<WarehouseArea> WarehouseAreas { get; set; }
         public DbSet<AreaInventory> AreaInventories { get; set; }
+        public DbSet<InvoiceSetting> InvoiceSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

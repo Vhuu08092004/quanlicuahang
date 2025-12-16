@@ -536,7 +536,8 @@ namespace Quanlicuahang.Services
                 {
                     Id = p.Id,
                     Code = p.Code,
-                    Name = p.Name
+                    Name = p.Name,
+                    SupplierId = p.SupplierId
                 })
                 .ToListAsync();
 
@@ -559,6 +560,7 @@ namespace Quanlicuahang.Services
                 Id = p.Id,
                 Code = p.Code,
                 Name = p.Name,
+                SupplierId = p.SupplierId,
                 Quantity = quantityDict.ContainsKey(p.Id) ? quantityDict[p.Id] : 0
             }).ToList();
 

@@ -101,12 +101,55 @@ namespace Quanlicuahang.Controllers
             }
         }
 
+        [HttpDelete("delete/{id}")]
+        public async Task<IActionResult> Delete([FromRoute] string id)
+        {
+            try
+            {
+                var result = await _service.DeleteAsync(id);
+                if (!result) return NotFound("Khu vực kho không tồn tại");
+                return Ok("Xóa khu vực kho thành công");
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("select_box")]
         public async Task<IActionResult> SelectBox()
         {
             try
             {
                 var result = await _service.GetSelectBoxAsync();
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("transfer")]
+        public async Task<IActionResult> Transfer([FromBody] WarehouseAreaTransferDto dto)
+        {
+            try
+            {
+                var result = await _service.TransferProductAsync(dto);
+                return Ok(result);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("by_product/{productId}")]
+        public async Task<IActionResult> GetByProductId([FromRoute] string productId)
+        {
+            try
+            {
+                var result = await _service.GetWarehouseAreasByProductIdAsync(productId);
                 return Ok(result);
             }
             catch (System.Exception ex)

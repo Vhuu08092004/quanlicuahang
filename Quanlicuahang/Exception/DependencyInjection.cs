@@ -70,6 +70,10 @@ namespace Quanlicuahang.Exception
             services.AddScoped<IWarehouseAreaService, WarehouseAreaService>();
             services.AddScoped<IAreaInventoryRepository, AreaInventoryRepository>();
 
+            /* INVOICE SETTING */
+            services.AddScoped<IInvoiceSettingRepository, InvoiceSettingRepository>();
+            services.AddScoped<IInvoiceSettingService, InvoiceSettingService>();
+
 
             return services;
         }
