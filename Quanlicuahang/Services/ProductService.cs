@@ -24,6 +24,7 @@ namespace Quanlicuahang.Services
         private readonly IProductRepository _repo;
         private readonly IProductAttributeRepository _attributeRepo;
         private readonly IProductAttributeValueRepository _attributeValueRepo;
+        private readonly IAreaInventoryRepository _areaInventoryRepo;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
@@ -32,6 +33,7 @@ namespace Quanlicuahang.Services
             IProductRepository repo,
             IProductAttributeRepository attributeRepo,
             IProductAttributeValueRepository attributeValueRepo,
+            IAreaInventoryRepository areaInventoryRepo,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper)
@@ -39,6 +41,7 @@ namespace Quanlicuahang.Services
             _repo = repo;
             _attributeRepo = attributeRepo;
             _attributeValueRepo = attributeValueRepo;
+            _areaInventoryRepo = areaInventoryRepo;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -85,13 +88,13 @@ namespace Quanlicuahang.Services
 
             var total = await query.CountAsync();
 
-            var data = await query
+            var products = await query
                 .Include(p => p.Category)
                 .Include(p => p.Supplier)
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip(skip)
                 .Take(take)
-                .Select(p => new ProductDto
+                .Select(p => new
                 {
                     Id = p.Id,
                     Code = p.Code,
@@ -99,7 +102,6 @@ namespace Quanlicuahang.Services
                     Barcode = p.Barcode,
                     Price = p.Price,
                     Unit = p.Unit,
-                    Quantity = 0,
                     ImageUrl = p.ImageUrl,
                     CategoryId = p.CategoryId,
                     CategoryName = p.Category != null ? p.Category.Name : null,
@@ -107,14 +109,38 @@ namespace Quanlicuahang.Services
                     SupplierName = p.Supplier != null ? p.Supplier.Name : null,
                     IsDeleted = p.IsDeleted,
                     CreatedAt = p.CreatedAt,
-                    UpdatedAt = p.UpdatedAt,
-                    isCanView = true,
-                    isCanCreate = true,
-                    isCanEdit = !p.IsDeleted,
-                    isCanDeActive = !p.IsDeleted,
-                    isCanActive = p.IsDeleted
+                    UpdatedAt = p.UpdatedAt
                 })
                 .ToListAsync();
+
+            // Lấy tổng số lượng tồn kho từ AreaInventory cho các sản phẩm
+            var productIds = products.Select(p => p.Id).ToList();
+            var quantityDict = await GetProductsQuantityAsync(productIds);
+
+            // Map sang ProductDto với số lượng tồn kho
+            var data = products.Select(p => new ProductDto
+            {
+                Id = p.Id,
+                Code = p.Code,
+                Name = p.Name,
+                Barcode = p.Barcode,
+                Price = p.Price,
+                Unit = p.Unit,
+                Quantity = quantityDict.ContainsKey(p.Id) ? quantityDict[p.Id] : 0,
+                ImageUrl = p.ImageUrl,
+                CategoryId = p.CategoryId,
+                CategoryName = p.CategoryName,
+                SupplierId = p.SupplierId,
+                SupplierName = p.SupplierName,
+                IsDeleted = p.IsDeleted,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                isCanView = true,
+                isCanCreate = true,
+                isCanEdit = !p.IsDeleted,
+                isCanDeActive = !p.IsDeleted,
+                isCanActive = p.IsDeleted
+            }).ToList();
 
             return new { data, total };
         }
@@ -167,6 +193,9 @@ namespace Quanlicuahang.Services
 
             if (product == null) return null;
 
+            // Lấy tổng số lượng tồn kho từ AreaInventory
+            var totalQuantity = await GetProductQuantityAsync(product.Id);
+
             return new ProductDto
             {
                 Id = product.Id,
@@ -175,7 +204,7 @@ namespace Quanlicuahang.Services
                 Barcode = product.Barcode,
                 Price = product.Price,
                 Unit = product.Unit,
-                Quantity = 0,
+                Quantity = totalQuantity,
                 ImageUrl = product.ImageUrl,
                 CategoryId = product.CategoryId,
                 CategoryName = product.CategoryName,
@@ -500,20 +529,79 @@ namespace Quanlicuahang.Services
 
         public async Task<object> GetSelectBoxAsync()
         {
-            var query = _repo.GetAll(false)
+            // Lấy danh sách sản phẩm
+            var products = await _repo.GetAll(false)
                 .OrderBy(p => p.Name)
                 .Select(p => new
                 {
                     Id = p.Id,
                     Code = p.Code,
-                    Name = p.Name,
-                    Quantity = 0
-                });
+                    Name = p.Name
+                })
+                .ToListAsync();
 
-            var data = await query.ToListAsync();
+            // Lấy tổng số lượng tồn kho từ AreaInventory cho mỗi sản phẩm
+            var inventoryQuantities = await _areaInventoryRepo.GetAll(false)
+                .GroupBy(ai => ai.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    TotalQuantity = g.Sum(ai => ai.Quantity)
+                })
+                .ToListAsync();
+
+            // Tạo dictionary để tra cứu nhanh
+            var quantityDict = inventoryQuantities.ToDictionary(x => x.ProductId, x => x.TotalQuantity);
+
+            // Kết hợp dữ liệu
+            var data = products.Select(p => new
+            {
+                Id = p.Id,
+                Code = p.Code,
+                Name = p.Name,
+                Quantity = quantityDict.ContainsKey(p.Id) ? quantityDict[p.Id] : 0
+            }).ToList();
+
             var total = data.Count;
 
             return new { data, total };
+        }
+
+        // Lấy tổng số lượng tồn kho của sản phẩm từ AreaInventory
+        public async Task<int> GetProductQuantityAsync(string productId)
+        {
+            var totalQuantity = await _areaInventoryRepo.GetAll(false)
+                .Where(ai => ai.ProductId == productId)
+                .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+            return totalQuantity;
+        }
+
+        // Lấy tổng số lượng tồn kho của nhiều sản phẩm từ AreaInventory
+        public async Task<Dictionary<string, int>> GetProductsQuantityAsync(List<string> productIds)
+        {
+            var inventoryQuantities = await _areaInventoryRepo.GetAll(false)
+                .Where(ai => productIds.Contains(ai.ProductId))
+                .GroupBy(ai => ai.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    TotalQuantity = g.Sum(ai => ai.Quantity)
+                })
+                .ToListAsync();
+
+            var quantityDict = inventoryQuantities.ToDictionary(x => x.ProductId, x => x.TotalQuantity);
+
+            // Đảm bảo tất cả productIds đều có trong dictionary (với giá trị 0 nếu không có tồn kho)
+            foreach (var productId in productIds)
+            {
+                if (!quantityDict.ContainsKey(productId))
+                {
+                    quantityDict[productId] = 0;
+                }
+            }
+
+            return quantityDict;
         }
     }
 }

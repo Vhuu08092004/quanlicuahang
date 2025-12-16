@@ -254,35 +254,6 @@ namespace Quanlicuahang.Services
                 };
                 entry.StockEntryItems.Add(sei);
 
-                // Cập nhật AreaInventory nếu có WarehouseAreaId
-                if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
-                {
-                    var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
-                        .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
-
-                    if (existingAreaInventory != null)
-                    {
-                        existingAreaInventory.Quantity += item.Quantity;
-                        existingAreaInventory.UpdatedBy = validUserId ?? "system";
-                        existingAreaInventory.UpdatedAt = DateTime.UtcNow;
-                        _areaInventoryRepo.Update(existingAreaInventory);
-                    }
-                    else
-                    {
-                        var newAreaInventory = new AreaInventory
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            WarehouseAreaId = item.WarehouseAreaId,
-                            ProductId = item.ProductId,
-                            Quantity = item.Quantity,
-                            CreatedBy = validUserId ?? "system",
-                            UpdatedBy = validUserId ?? "system",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        await _areaInventoryRepo.AddAsync(newAreaInventory);
-                    }
-                }
             }
 
             await _stockEntryRepo.SaveChangesAsync();
@@ -334,15 +305,9 @@ namespace Quanlicuahang.Services
                 if (!allowed)
                     throw new System.Exception($"Chuyển trạng thái {from} -> {to} không hợp lệ.");
 
-                if (to == "cancelled")
+                if (to == "completed")
                 {
-                    var groups = entry.StockEntryItems.Where(i => !i.IsDeleted)
-                        .GroupBy(i => i.ProductId)
-                        .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-                        .ToList();
-
-
-                    // Trừ lại quantity từ AreaInventory khi hủy phiếu
+                    // Cộng số lượng vào AreaInventory khi duyệt phiếu nhập
                     foreach (var item in entry.StockEntryItems.Where(i => !i.IsDeleted && !string.IsNullOrWhiteSpace(i.WarehouseAreaId)))
                     {
                         var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
@@ -350,10 +315,47 @@ namespace Quanlicuahang.Services
 
                         if (existingAreaInventory != null)
                         {
-                            existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - item.Quantity);
+                            existingAreaInventory.Quantity += item.Quantity;
                             existingAreaInventory.UpdatedBy = userId;
                             existingAreaInventory.UpdatedAt = DateTime.UtcNow;
                             _areaInventoryRepo.Update(existingAreaInventory);
+                        }
+                        else
+                        {
+                            var newAreaInventory = new AreaInventory
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                WarehouseAreaId = item.WarehouseAreaId,
+                                ProductId = item.ProductId,
+                                Quantity = item.Quantity,
+                                CreatedBy = userId,
+                                UpdatedBy = userId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            await _areaInventoryRepo.AddAsync(newAreaInventory);
+                        }
+                    }
+                }
+                else if (to == "cancelled")
+                {
+                    // Chỉ trừ lại quantity từ AreaInventory khi hủy phiếu đã được duyệt (đã cộng vào kho)
+                    // Nếu phiếu chưa được duyệt thì không cần trừ vì chưa cộng vào kho
+                    var fromStatus = (entry.Status ?? "pending").Trim().ToLower();
+                    if (fromStatus == "completed")
+                    {
+                        foreach (var item in entry.StockEntryItems.Where(i => !i.IsDeleted && !string.IsNullOrWhiteSpace(i.WarehouseAreaId)))
+                        {
+                            var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                                .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
+
+                            if (existingAreaInventory != null)
+                            {
+                                existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - item.Quantity);
+                                existingAreaInventory.UpdatedBy = userId;
+                                existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                                _areaInventoryRepo.Update(existingAreaInventory);
+                            }
                         }
                     }
                 }
@@ -452,18 +454,24 @@ namespace Quanlicuahang.Services
                     }
                 }
 
-                // Trừ lại quantity cũ từ AreaInventory trước khi xóa các item cũ (chỉ các items chưa bị xóa)
-                foreach (var oldItem in entry.StockEntryItems.Where(x => !x.IsDeleted && !string.IsNullOrWhiteSpace(x.WarehouseAreaId)))
-                {
-                    var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
-                        .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == oldItem.WarehouseAreaId && ai.ProductId == oldItem.ProductId);
+                // Chỉ điều chỉnh kho khi phiếu đã được duyệt (status = completed)
+                var isCompleted = (entry.Status ?? "").Trim().ToLower() == "completed";
 
-                    if (existingAreaInventory != null)
+                if (isCompleted)
+                {
+                    // Trừ lại quantity cũ từ AreaInventory trước khi xóa các item cũ
+                    foreach (var oldItem in entry.StockEntryItems.Where(x => !x.IsDeleted && !string.IsNullOrWhiteSpace(x.WarehouseAreaId)))
                     {
-                        existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - oldItem.Quantity);
-                        existingAreaInventory.UpdatedBy = userId;
-                        existingAreaInventory.UpdatedAt = DateTime.UtcNow;
-                        _areaInventoryRepo.Update(existingAreaInventory);
+                        var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
+                            .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == oldItem.WarehouseAreaId && ai.ProductId == oldItem.ProductId);
+
+                        if (existingAreaInventory != null)
+                        {
+                            existingAreaInventory.Quantity = Math.Max(0, existingAreaInventory.Quantity - oldItem.Quantity);
+                            existingAreaInventory.UpdatedBy = userId;
+                            existingAreaInventory.UpdatedAt = DateTime.UtcNow;
+                            _areaInventoryRepo.Update(existingAreaInventory);
+                        }
                     }
                 }
 
@@ -493,8 +501,8 @@ namespace Quanlicuahang.Services
                     };
                     entry.StockEntryItems.Add(newItem);
 
-                    // Cập nhật AreaInventory nếu có WarehouseAreaId
-                    if (!string.IsNullOrWhiteSpace(item.WarehouseAreaId))
+                    // Chỉ cộng vào kho khi phiếu đã được duyệt
+                    if (isCompleted && !string.IsNullOrWhiteSpace(item.WarehouseAreaId))
                     {
                         var existingAreaInventory = await _areaInventoryRepo.GetAll(false)
                             .FirstOrDefaultAsync(ai => ai.WarehouseAreaId == item.WarehouseAreaId && ai.ProductId == item.ProductId);
