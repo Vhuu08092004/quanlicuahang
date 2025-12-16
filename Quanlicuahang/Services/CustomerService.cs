@@ -274,7 +274,7 @@ namespace Quanlicuahang.Services
                 .Select(c => new SelectBoxDto
                 {
                     Id = c.Id,
-                    Code = c.Code,
+                    Code = c.Phone, // Dùng Code field để lưu số điện thoại
                     Name = c.Name
                 });
 

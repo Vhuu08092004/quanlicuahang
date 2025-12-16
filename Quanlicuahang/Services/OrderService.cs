@@ -318,39 +318,56 @@ namespace Quanlicuahang.Services
                 order.OrderItems.Add(oi);
             }
 
-            // Update product stock quantities (decrease by ordered quantities)
-            var grouped = dto.Items
-                .GroupBy(x => x.ProductId)
-                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-                .ToList();
-
-            // Trừ số lượng từ AreaInventory (khu vực kho)
-            foreach (var g in grouped)
-            {
-                var remainingQty = g.Qty;
-
-                // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
-                var areaInventories = await _areaInventoryRepo.GetAll(false)
-                    .Where(ai => ai.ProductId == g.ProductId && ai.Quantity > 0)
-                    .OrderByDescending(ai => ai.Quantity)
-                    .ToListAsync();
-
-                foreach (var areaInv in areaInventories)
-                {
-                    if (remainingQty <= 0) break;
-
-                    var deductQty = Math.Min(remainingQty, areaInv.Quantity);
-                    areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
-                    areaInv.UpdatedBy = validUserId ?? "system";
-                    areaInv.UpdatedAt = DateTime.UtcNow;
-                    _areaInventoryRepo.Update(areaInv);
-
-                    remainingQty -= deductQty;
-                }
-            }
-
             // Persist order + items
             await _orderRepo.SaveChangesAsync();
+
+            // Helper function để trừ kho
+            async Task DeductInventoryAsync()
+            {
+                var grouped = dto.Items
+                    .GroupBy(x => x.ProductId)
+                    .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                    .ToList();
+
+                foreach (var g in grouped)
+                {
+                    // Kiểm tra tồn kho trước khi trừ
+                    var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                        .Where(ai => ai.ProductId == g.ProductId)
+                        .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                    if (totalAvailable < g.Qty)
+                        throw new System.Exception($"Sản phẩm {g.ProductId} không đủ tồn kho. Cần {g.Qty}, còn {totalAvailable}");
+
+                    var remainingQty = g.Qty;
+                    var areaInventories = await _areaInventoryRepo.GetAll(false)
+                        .Where(ai => ai.ProductId == g.ProductId && ai.Quantity > 0)
+                        .OrderByDescending(ai => ai.Quantity)
+                        .ToListAsync();
+
+                    foreach (var areaInv in areaInventories)
+                    {
+                        if (remainingQty <= 0) break;
+
+                        var deductQty = Math.Min(remainingQty, areaInv.Quantity);
+                        areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
+                        areaInv.UpdatedBy = validUserId ?? "system";
+                        areaInv.UpdatedAt = DateTime.UtcNow;
+                        _areaInventoryRepo.Update(areaInv);
+
+                        remainingQty -= deductQty;
+                    }
+                }
+
+                // Lưu lại thay đổi kho
+                await _areaInventoryRepo.SaveChangesAsync();
+            }
+
+            // Trừ kho khi đơn hàng có status = Paid (đơn hàng miễn phí netAmount = 0)
+            if (order.Status == OrderStatus.Paid && netAmount == 0)
+            {
+                await DeductInventoryAsync();
+            }
 
             // Create payment automatically if requested and amount > 0
             if (dto.CreatePayment && netAmount > 0)
@@ -382,6 +399,9 @@ namespace Quanlicuahang.Services
                     order.PaidAmount = netAmount;
                     order.UpdatedBy = validUserId ?? "system";
                     order.UpdatedAt = DateTime.UtcNow;
+
+                    // Trừ số lượng từ AreaInventory khi thanh toán tiền mặt (status = Paid)
+                    await DeductInventoryAsync();
 
                     await _logService.LogAsync(
                         code: Guid.NewGuid().ToString(),
@@ -476,6 +496,10 @@ namespace Quanlicuahang.Services
                 .FirstOrDefaultAsync(o => o.Id == id);
             if (order == null) throw new System.Exception("Không tìm thấy đơn hàng");
 
+            // Đảm bảo OrderItems không null
+            if (order.OrderItems == null)
+                order.OrderItems = new List<OrderItem>();
+
             var userId = await _tokenHelper.GetUserIdFromTokenAsync();
             if (string.IsNullOrEmpty(userId))
                 throw new UnauthorizedAccessException("Không thể xác định người dùng. Vui lòng đăng nhập lại!");
@@ -496,29 +520,56 @@ namespace Quanlicuahang.Services
                 if (!allowed)
                     throw new System.Exception($"Chuyển trạng thái {currentStatus} -> {newStatus} không hợp lệ.");
 
-                if (newStatus == OrderStatus.Cancelled)
+                if (newStatus == OrderStatus.Paid)
                 {
-                    // Hoàn kho theo số lượng hiện tại của đơn
-                    var groups = order.OrderItems.Where(oi => !oi.IsDeleted)
-                        .GroupBy(i => i.ProductId)
-                        .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-                        .ToList();
-
-                    // Hoàn lại số lượng vào AreaInventory khi hủy đơn
-                    foreach (var g in groups)
+                    // Chỉ trừ kho khi đơn hàng chuyển sang Paid và chưa được thanh toán trước đó
+                    // Nếu đơn hàng đã ở trạng thái Paid thì không trừ kho lại
+                    if (currentStatus != OrderStatus.Paid)
                     {
-                        // Tìm AreaInventory đầu tiên có sản phẩm này để cộng lại
-                        var areaInventory = await _areaInventoryRepo.GetAll(false)
-                            .FirstOrDefaultAsync(ai => ai.ProductId == g.ProductId);
+                        var grouped = order.OrderItems.Where(oi => !oi.IsDeleted)
+                            .GroupBy(x => x.ProductId)
+                            .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                            .ToList();
 
-                        if (areaInventory != null)
+                        foreach (var g in grouped)
                         {
-                            areaInventory.Quantity += Math.Abs(g.Qty);
-                            areaInventory.UpdatedBy = userId;
-                            areaInventory.UpdatedAt = DateTime.UtcNow;
-                            _areaInventoryRepo.Update(areaInventory);
+                            // Kiểm tra tồn kho trước khi trừ
+                            var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                                .Where(ai => ai.ProductId == g.ProductId)
+                                .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                            if (totalAvailable < g.Qty)
+                                throw new System.Exception($"Sản phẩm {g.ProductId} không đủ tồn kho. Cần {g.Qty}, còn {totalAvailable}");
+
+                            var remainingQty = g.Qty;
+                            var areaInventories = await _areaInventoryRepo.GetAll(false)
+                                .Where(ai => ai.ProductId == g.ProductId && ai.Quantity > 0)
+                                .OrderByDescending(ai => ai.Quantity)
+                                .ToListAsync();
+
+                            foreach (var areaInv in areaInventories)
+                            {
+                                if (remainingQty <= 0) break;
+                                var deductQty = Math.Min(remainingQty, areaInv.Quantity);
+                                areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
+                                areaInv.UpdatedBy = userId;
+                                areaInv.UpdatedAt = DateTime.UtcNow;
+                                _areaInventoryRepo.Update(areaInv);
+                                remainingQty -= deductQty;
+                            }
                         }
                     }
+                }
+                else if (newStatus == OrderStatus.Cancelled)
+                {
+                    // Hoàn kho khi hủy đơn hàng (chỉ khi đơn ở trạng thái Confirmed - đã duyệt nhưng chưa thanh toán)
+                    // Đơn hàng đã thanh toán (Paid) không thể hủy
+                    if (currentStatus == OrderStatus.Confirmed)
+                    {
+                        // Trường hợp này không xảy ra vì Confirmed chưa trừ kho, nhưng để đảm bảo logic rõ ràng
+                        // Không cần hoàn kho vì chưa trừ kho
+                    }
+                    // Nếu đơn ở trạng thái Pending hoặc Confirmed thì không cần hoàn kho vì chưa trừ kho
                 }
 
                 order.Status = newStatus;
@@ -543,9 +594,9 @@ namespace Quanlicuahang.Services
                 return (await GetByIdAsync(order.Id))!;
             }
 
-            // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending
-            if (order.Status != OrderStatus.Pending)
-                throw new System.Exception("Chỉ cho phép chỉnh sửa khi đơn hàng đang Pending");
+            // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending hoặc Confirmed (chưa thanh toán)
+            if (order.Status != OrderStatus.Pending && order.Status != OrderStatus.Confirmed)
+                throw new System.Exception($"Chỉ cho phép chỉnh sửa khi đơn hàng đang Pending hoặc Confirmed. Trạng thái hiện tại: {order.Status}");
 
             // Validate items nếu được truyền vào
             if (dto.Items != null)
@@ -562,81 +613,18 @@ namespace Quanlicuahang.Services
                     var product = await _productRepo.GetByIdAsync(item.ProductId);
                     if (product == null || product.IsDeleted)
                         throw new System.Exception($"Sản phẩm {item.ProductId} không tồn tại hoặc đã bị xóa");
+
+                    // Kiểm tra tồn kho (chỉ kiểm tra, không trừ kho vì đơn đang Pending)
+                    var totalAvailable = await _areaInventoryRepo.GetAll(false)
+                        .Where(ai => ai.ProductId == item.ProductId)
+                        .SumAsync(ai => (int?)ai.Quantity) ?? 0;
+
+                    if (totalAvailable < item.Quantity)
+                        throw new System.Exception($"Sản phẩm {item.ProductId} không đủ tồn kho. Cần {item.Quantity}, còn {totalAvailable}");
                 }
 
-                var oldGroups = order.OrderItems
-                    .Where(oi => !oi.IsDeleted)
-                    .GroupBy(x => x.ProductId)
-                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
-                var newGroups = dto.Items
-                    .GroupBy(x => x.ProductId)
-                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
-
-                // Điều chỉnh tồn kho theo delta
-                var affectedProductIds = oldGroups.Keys.Union(newGroups.Keys).Distinct().ToList();
-
-                foreach (var pid in affectedProductIds)
-                {
-                    var oldQty = oldGroups.ContainsKey(pid) ? oldGroups[pid] : 0;
-                    var newQty = newGroups.ContainsKey(pid) ? newGroups[pid] : 0;
-                    var delta = newQty - oldQty;
-
-                    if (delta != 0)
-                    {
-                        // Kiểm tra tồn kho từ AreaInventory nếu delta > 0
-                        if (delta > 0)
-                        {
-                            var totalAvailable = await _areaInventoryRepo.GetAll(false)
-                                .Where(ai => ai.ProductId == pid)
-                                .SumAsync(ai => (int?)ai.Quantity) ?? 0;
-
-                            if (totalAvailable < delta)
-                                throw new System.Exception($"Sản phẩm {pid} không đủ tồn kho. Cần thêm {delta}, còn {totalAvailable}");
-                        }
-
-                        // Trừ số lượng từ AreaInventory nếu delta > 0 (số lượng mới lớn hơn số lượng cũ)
-                        if (delta > 0)
-                        {
-                            var remainingQty = delta;
-
-                            // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
-                            var areaInventories = await _areaInventoryRepo.GetAll(false)
-                                .Where(ai => ai.ProductId == pid && ai.Quantity > 0)
-                                .OrderByDescending(ai => ai.Quantity)
-                                .ToListAsync();
-
-                            foreach (var areaInv in areaInventories)
-                            {
-                                if (remainingQty <= 0) break;
-
-                                var deductQty = Math.Min(remainingQty, areaInv.Quantity);
-                                areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
-                                areaInv.UpdatedBy = userId;
-                                areaInv.UpdatedAt = DateTime.UtcNow;
-                                _areaInventoryRepo.Update(areaInv);
-
-                                remainingQty -= deductQty;
-                            }
-                        }
-                        // Nếu delta < 0 (số lượng mới nhỏ hơn số lượng cũ), cần cộng lại vào AreaInventory
-                        else if (delta < 0)
-                        {
-                            var addQty = Math.Abs(delta);
-
-                            // Tìm AreaInventory đầu tiên có sản phẩm này để cộng lại
-                            var areaInventory = await _areaInventoryRepo.GetAll(false)
-                                .FirstOrDefaultAsync(ai => ai.ProductId == pid);
-
-                            if (areaInventory != null)
-                            {
-                                areaInventory.Quantity += addQty;
-                                areaInventory.UpdatedBy = userId;
-                                areaInventory.UpdatedAt = DateTime.UtcNow;
-                                _areaInventoryRepo.Update(areaInventory);
-                            }
-                        }
-                    }
-                }
+                // Không điều chỉnh kho khi sửa đơn hàng ở trạng thái Pending
+                // Kho chỉ được điều chỉnh khi duyệt đơn hàng (status = confirmed/paid) hoặc khi thanh toán tiền mặt
 
                 // Soft-delete toàn bộ items cũ (chỉ các items chưa bị xóa)
                 foreach (var oi in order.OrderItems.Where(oi => !oi.IsDeleted))
@@ -732,7 +720,7 @@ namespace Quanlicuahang.Services
                 OrderStatus.Confirmed => newStatus == OrderStatus.Paid ||
                                        newStatus == OrderStatus.Cancelled,
 
-                OrderStatus.Paid => newStatus == OrderStatus.Cancelled,
+                OrderStatus.Paid => false, // Đơn hàng đã thanh toán không thể thay đổi trạng thái
 
                 OrderStatus.Cancelled => false, // Không thể chuyển từ Cancelled sang trạng thái khác
 

@@ -1325,13 +1325,22 @@ namespace Quanlicuahang.Data
             );
 
             // Seed AreaInventories
+            // Số lượng = StockEntryItems (nhập) - OrderItems (xuất)
+            // AI1: prod1Id, wa1Id: SEI1 nhập 500 - OI1 xuất 10 = 490
+            // AI2: prod2Id, wa1Id: SEI2 nhập 450 - OI6 xuất 3 = 447
+            // AI3: prod3Id, wa1Id: SEI3 nhập 1000 - OI2 xuất 10 - OI7 xuất 3 = 987
+            // AI4: prod4Id, wa2Id: SEI4 nhập 300 - OI3 xuất 5 = 295
+            // AI5: prod5Id, wa2Id: SEI5 nhập 150 - không xuất = 150
+            // AI6: prod6Id, wa2Id: SEI6 nhập 200 - OI4 xuất 1 = 199
+            // AI7: prod7Id, wa3Id: SEI7 nhập 200 - không xuất = 200
+            // AI8: prod8Id, wa3Id: SEI8 nhập 150 - OI5 xuất 1 = 149
             modelBuilder.Entity<AreaInventory>().HasData(
                 new AreaInventory
                 {
                     Id = GenerateSeedId("AI", 1),
                     WarehouseAreaId = wa1Id,
                     ProductId = prod1Id,
-                    Quantity = 500,
+                    Quantity = 490, // SEI1: 500 - OI1: 10
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1343,7 +1352,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 2),
                     WarehouseAreaId = wa1Id,
                     ProductId = prod2Id,
-                    Quantity = 450,
+                    Quantity = 447, // SEI2: 450 - OI6: 3
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1355,7 +1364,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 3),
                     WarehouseAreaId = wa1Id,
                     ProductId = prod3Id,
-                    Quantity = 1000,
+                    Quantity = 987, // SEI3: 1000 - OI2: 10 - OI7: 3
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1367,7 +1376,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 4),
                     WarehouseAreaId = wa2Id,
                     ProductId = prod4Id,
-                    Quantity = 300,
+                    Quantity = 295, // SEI4: 300 - OI3: 5
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1379,7 +1388,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 5),
                     WarehouseAreaId = wa2Id,
                     ProductId = prod5Id,
-                    Quantity = 150,
+                    Quantity = 150, // SEI5: 150 - không xuất
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1391,7 +1400,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 6),
                     WarehouseAreaId = wa2Id,
                     ProductId = prod6Id,
-                    Quantity = 200,
+                    Quantity = 199, // SEI6: 200 - OI4: 1
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1403,7 +1412,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 7),
                     WarehouseAreaId = wa3Id,
                     ProductId = prod7Id,
-                    Quantity = 200,
+                    Quantity = 200, // SEI7: 200 - không xuất
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1415,7 +1424,7 @@ namespace Quanlicuahang.Data
                     Id = GenerateSeedId("AI", 8),
                     WarehouseAreaId = wa3Id,
                     ProductId = prod8Id,
-                    Quantity = 150,
+                    Quantity = 149, // SEI8: 150 - OI5: 1
                     CreatedAt = now,
                     CreatedBy = "System",
                     UpdatedAt = now,
@@ -1436,7 +1445,7 @@ namespace Quanlicuahang.Data
                     SupplierId = sup1Id,
                     EntryDate = now.AddDays(-5),
                     Status = "completed",
-                    TotalCost = 5000000m,
+                    TotalCost = 12600000m, // 4000000 + 3600000 + 5000000
                     Note = "Nhập hàng đầu tháng",
                     UserId = stockUserId,
                     CreatedAt = now.AddDays(-5),
@@ -1452,7 +1461,7 @@ namespace Quanlicuahang.Data
                     SupplierId = sup2Id,
                     EntryDate = now.AddDays(-2),
                     Status = "completed",
-                    TotalCost = 3000000m,
+                    TotalCost = 10450000m, // 3000000 + 1800000 + 2400000 + 3000000 + 2250000
                     Note = "Nhập hàng snack và bánh kẹo",
                     UserId = stockUserId,
                     CreatedAt = now.AddDays(-2),
@@ -1464,6 +1473,14 @@ namespace Quanlicuahang.Data
             );
 
             // Seed StockEntryItems
+            // SEI1: prod1Id, wa1Id, Quantity = 500 → AreaInventory AI1 ban đầu = 500, sau khi xuất 10 còn 490
+            // SEI2: prod2Id, wa1Id, Quantity = 450 → AreaInventory AI2 ban đầu = 450, sau khi xuất 3 còn 447
+            // SEI3: prod4Id, wa2Id, Quantity = 300 → AreaInventory AI4 ban đầu = 300, sau khi xuất 5 còn 295
+            // SEI4: prod3Id, wa1Id, Quantity = 1000 → AreaInventory AI3 ban đầu = 1000, sau khi xuất 13 còn 987
+            // SEI5: prod5Id, wa2Id, Quantity = 150 → AreaInventory AI5 = 150
+            // SEI6: prod6Id, wa2Id, Quantity = 200 → AreaInventory AI6 ban đầu = 200, sau khi xuất 1 còn 199
+            // SEI7: prod7Id, wa3Id, Quantity = 200 → AreaInventory AI7 = 200
+            // SEI8: prod8Id, wa3Id, Quantity = 150 → AreaInventory AI8 ban đầu = 150, sau khi xuất 1 còn 149
             modelBuilder.Entity<StockEntryItem>().HasData(
                 new StockEntryItem
                 {
@@ -1498,12 +1515,87 @@ namespace Quanlicuahang.Data
                 new StockEntryItem
                 {
                     Id = GenerateSeedId("SEI", 3),
+                    StockEntryId = se1Id,
+                    ProductId = prod3Id,
+                    Quantity = 1000,
+                    UnitCost = 5000m,
+                    Subtotal = 5000000m,
+                    WarehouseAreaId = wa1Id,
+                    CreatedAt = now.AddDays(-5),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-5),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 4),
                     StockEntryId = se2Id,
                     ProductId = prod4Id,
                     Quantity = 300,
                     UnitCost = 10000m,
                     Subtotal = 3000000m,
                     WarehouseAreaId = wa2Id,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 5),
+                    StockEntryId = se2Id,
+                    ProductId = prod5Id,
+                    Quantity = 150,
+                    UnitCost = 12000m,
+                    Subtotal = 1800000m,
+                    WarehouseAreaId = wa2Id,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 6),
+                    StockEntryId = se2Id,
+                    ProductId = prod6Id,
+                    Quantity = 200,
+                    UnitCost = 12000m,
+                    Subtotal = 2400000m,
+                    WarehouseAreaId = wa2Id,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 7),
+                    StockEntryId = se2Id,
+                    ProductId = prod7Id,
+                    Quantity = 200,
+                    UnitCost = 15000m,
+                    Subtotal = 3000000m,
+                    WarehouseAreaId = wa3Id,
+                    CreatedAt = now.AddDays(-2),
+                    CreatedBy = "System",
+                    UpdatedAt = now.AddDays(-2),
+                    UpdatedBy = "System",
+                    IsDeleted = false
+                },
+                new StockEntryItem
+                {
+                    Id = GenerateSeedId("SEI", 8),
+                    StockEntryId = se2Id,
+                    ProductId = prod8Id,
+                    Quantity = 150,
+                    UnitCost = 15000m,
+                    Subtotal = 2250000m,
+                    WarehouseAreaId = wa3Id,
                     CreatedAt = now.AddDays(-2),
                     CreatedBy = "System",
                     UpdatedAt = now.AddDays(-2),
