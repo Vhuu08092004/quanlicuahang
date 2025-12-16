@@ -11,7 +11,9 @@ namespace Quanlicuahang.Services
     public interface IProductService
     {
         Task<object> GetAllAsync(ProductSearchDto searchDto);
+        Task<object> GetAllAsyncWithQuantity(ProductSearchDto searchDto);
         Task<ProductDto?> GetByIdAsync(string id);
+        Task<object?> GetByIdAsyncWithQuantity(string id);
         Task<ProductDto> CreateAsync(ProductCreateUpdateDto dto);
         Task<bool> UpdateAsync(string id, ProductCreateUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
@@ -25,6 +27,7 @@ namespace Quanlicuahang.Services
         private readonly IProductAttributeRepository _attributeRepo;
         private readonly IProductAttributeValueRepository _attributeValueRepo;
         private readonly IAreaInventoryRepository _areaInventoryRepo;
+        private readonly IAreaInventoryRepository _areaInventoryRepository;
         private readonly IActionLogService _logService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
@@ -34,6 +37,7 @@ namespace Quanlicuahang.Services
             IProductAttributeRepository attributeRepo,
             IProductAttributeValueRepository attributeValueRepo,
             IAreaInventoryRepository areaInventoryRepo,
+            IAreaInventoryRepository areaInventoryRepository,
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper)
@@ -42,6 +46,7 @@ namespace Quanlicuahang.Services
             _attributeRepo = attributeRepo;
             _attributeValueRepo = attributeValueRepo;
             _areaInventoryRepo = areaInventoryRepo;
+            _areaInventoryRepository = areaInventoryRepository;
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
@@ -145,6 +150,108 @@ namespace Quanlicuahang.Services
             return new { data, total };
         }
 
+        // Lấy sản phẩm kèm số lượng tồn kho
+        public async Task<object> GetAllAsyncWithQuantity(ProductSearchDto searchDto)
+        {
+            var skip = searchDto.Skip < 0 ? 0 : searchDto.Skip;
+            var take = searchDto.Take <= 0 ? 10 : searchDto.Take;
+
+            var query = _repo.GetAll(true);
+
+            if (searchDto.Where != null)
+            {
+                var where = searchDto.Where;
+
+                if (!string.IsNullOrWhiteSpace(where.Code))
+                {
+                    var code = where.Code.Trim().ToLower();
+                    query = query.Where(p => p.Code.ToLower().Contains(code));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.Name))
+                {
+                    var name = where.Name.Trim().ToLower();
+                    query = query.Where(p => p.Name.ToLower().Contains(name));
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.CategoryId))
+                {
+                    query = query.Where(p => p.CategoryId != null && p.CategoryId.ToString() == where.CategoryId.Trim());
+                }
+
+                if (!string.IsNullOrWhiteSpace(where.SupplierId))
+                {
+                    query = query.Where(p => p.SupplierId != null && p.SupplierId.ToString() == where.SupplierId.Trim());
+                }
+
+                if (where.IsDeleted.HasValue)
+                {
+                    query = query.Where(p => p.IsDeleted == where.IsDeleted.Value);
+                }
+            }
+
+            var total = await query.CountAsync();
+
+            var data = await query
+                .Include(p => p.Category)
+                .Include(p => p.Supplier)
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip(skip)
+                .Take(take)
+                .Select(p => new ProductDto
+                {
+                    Id = p.Id,
+                    Code = p.Code,
+                    Name = p.Name,
+                    Barcode = p.Barcode,
+                    Price = p.Price,
+                    Unit = p.Unit,
+                    Quantity = 0,
+                    ImageUrl = p.ImageUrl,
+                    CategoryId = p.CategoryId,
+                    CategoryName = p.Category != null ? p.Category.Name : null,
+                    SupplierId = p.SupplierId,
+                    SupplierName = p.Supplier != null ? p.Supplier.Name : null,
+                    IsDeleted = p.IsDeleted,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    isCanView = true,
+                    isCanCreate = true,
+                    isCanEdit = !p.IsDeleted,
+                    isCanDeActive = !p.IsDeleted,
+                    isCanActive = p.IsDeleted
+                })
+                .ToListAsync();
+
+            var map = new Dictionary<string, AreaInventory>();
+            var areaInventorys = await _areaInventoryRepository.GetByAreaInventoryByProductIds(data.Select(d => d.Id).ToArray());
+            foreach (var areaInventory in areaInventorys)
+            {
+                if (map.ContainsKey(areaInventory.ProductId))
+                {
+                    map[areaInventory.ProductId].Quantity += areaInventory.Quantity;
+                }
+                else
+                {
+                    map[areaInventory.ProductId] = new AreaInventory
+                    {
+                        ProductId = areaInventory.ProductId,
+                        Quantity = areaInventory.Quantity
+                    };
+                }
+            }
+
+            foreach (var item in data)
+            {
+                if (map.ContainsKey(item.Id))
+                {
+                    item.Quantity = map[item.Id].Quantity;
+                }
+            }
+
+            return new { data, total };
+        }
+
         public async Task<ProductDto?> GetByIdAsync(string id)
         {
             var product = await _repo.GetAll(true)
@@ -214,6 +321,54 @@ namespace Quanlicuahang.Services
                 IsDeleted = product.IsDeleted,
                 CreatedAt = product.CreatedAt,
                 UpdatedAt = product.UpdatedAt
+            };
+        }
+
+        public async Task<object?> GetByIdAsyncWithQuantity(string id)
+        {
+            var product = await _repo.GetAll(true)
+                .Include(p => p.Category)
+                .Include(p => p.Supplier)
+                .Where(p => p.Id == id)
+                .Select(p => new
+                {
+                    Id = p.Id,
+                    Code = p.Code,
+                    Name = p.Name,
+                    Barcode = p.Barcode,
+                    Price = p.Price,
+                    Unit = p.Unit,
+                    ImageUrl = p.ImageUrl,
+                    CategoryId = p.CategoryId,
+                    CategoryName = p.Category != null ? p.Category.Name : null,
+                    SupplierId = p.SupplierId,
+                    SupplierName = p.Supplier != null ? p.Supplier.Name : null,
+                    IsDeleted = p.IsDeleted,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt
+                })
+                .FirstOrDefaultAsync();
+            if (product == null) return null;
+            // Lấy tồn kho cho sản phẩm
+            var areaInventorys = await _areaInventoryRepository.GetByAreaInventoryByProductIds(new string[] { product.Id });
+            var totalQuantity = areaInventorys.Sum(ai => ai.Quantity);
+            return new
+            {
+                product.Id,
+                product.Code,
+                product.Name,
+                product.Barcode,
+                product.Price,
+                product.Unit,
+                Quantity = totalQuantity,
+                product.ImageUrl,
+                product.CategoryId,
+                product.CategoryName,
+                product.SupplierId,
+                product.SupplierName,
+                product.IsDeleted,
+                product.CreatedAt,
+                product.UpdatedAt
             };
         }
 
