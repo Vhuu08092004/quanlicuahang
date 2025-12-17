@@ -1,4 +1,4 @@
-﻿using Quanlicuahang.Enum;
+using Quanlicuahang.Enum;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
@@ -167,6 +167,8 @@ namespace Quanlicuahang.Helpers
                 "pending" => (status = OrderStatus.Pending) == OrderStatus.Pending,
                 "daxacnhan" => (status = OrderStatus.Confirmed) == OrderStatus.Confirmed,
                 "confirmed" => (status = OrderStatus.Confirmed) == OrderStatus.Confirmed,
+                "dagiaohang" => (status = OrderStatus.Delivered) == OrderStatus.Delivered,
+                "delivered" => (status = OrderStatus.Delivered) == OrderStatus.Delivered,
                 "dathanhtoan" => (status = OrderStatus.Paid) == OrderStatus.Paid,
                 "paid" => (status = OrderStatus.Paid) == OrderStatus.Paid,
                 "dahuy" => (status = OrderStatus.Cancelled) == OrderStatus.Cancelled,

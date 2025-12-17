@@ -1,4 +1,4 @@
-﻿namespace Quanlicuahang.Enum
+namespace Quanlicuahang.Enum
 {
     public enum PaymentMethod
     {
@@ -21,7 +21,8 @@
     public enum OrderStatus
     {
         Pending, // Đang chờ xử lý
-        Confirmed, // Đã xác nhận
+        Confirmed, // Đã xác nhận (nhân viên đã gọi điện xác nhận)
+        Delivered, // Đã giao hàng
         Paid, // Đã thanh toán
         Cancelled, // Đã hủy
     }

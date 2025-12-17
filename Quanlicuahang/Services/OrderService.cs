@@ -140,8 +140,8 @@ namespace Quanlicuahang.Services
                     isCanDeActive = !o.IsDeleted,
                     isCanActive = o.IsDeleted,
                     isCanUpdateStatus = !o.IsDeleted,
-                    isCanCancel = o.Status == OrderStatus.Pending && !o.IsDeleted,
-                    isCanDeliver = (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Paid) && !o.IsDeleted,
+                    isCanCancel = (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Confirmed) && !o.IsDeleted,
+                    isCanDeliver = (o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.Pending) && !o.IsDeleted,
                 };
 
                 // Parse Info JSON if no Customer and no User
@@ -544,11 +544,12 @@ namespace Quanlicuahang.Services
                 if (!allowed)
                     throw new System.Exception($"Chuyển trạng thái {currentStatus} -> {newStatus} không hợp lệ.");
 
-                if (newStatus == OrderStatus.Paid)
+                // Trừ kho khi chuyển sang Delivered hoặc Paid (chỉ trừ một lần)
+                if (newStatus == OrderStatus.Delivered || newStatus == OrderStatus.Paid)
                 {
-                    // Chỉ trừ kho khi đơn hàng chuyển sang Paid và chưa được thanh toán trước đó
-                    // Nếu đơn hàng đã ở trạng thái Paid thì không trừ kho lại
-                    if (currentStatus != OrderStatus.Paid)
+                    // Chỉ trừ kho nếu đơn hàng chưa ở trạng thái Delivered hoặc Paid trước đó
+                    // (để tránh trừ kho lại khi chuyển từ Delivered sang Paid)
+                    if (currentStatus != OrderStatus.Delivered && currentStatus != OrderStatus.Paid)
                     {
                         var grouped = order.OrderItems.Where(oi => !oi.IsDeleted)
                             .GroupBy(x => x.ProductId)
@@ -583,7 +584,58 @@ namespace Quanlicuahang.Services
                                 remainingQty -= deductQty;
                             }
                         }
+
+                        // Lưu thay đổi kho
+                        await _areaInventoryRepo.SaveChangesAsync();
                     }
+                }
+                // Hoàn kho khi chuyển từ Delivered về Confirmed (khách không nhận hàng, cần giao lại)
+                else if (newStatus == OrderStatus.Confirmed && currentStatus == OrderStatus.Delivered)
+                {
+                    // Hoàn kho để có thể giao lại sau
+                    var grouped = order.OrderItems.Where(oi => !oi.IsDeleted)
+                        .GroupBy(x => x.ProductId)
+                        .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                        .ToList();
+
+                    foreach (var g in grouped)
+                    {
+                        // Hoàn kho: tìm AreaInventory của sản phẩm này và cộng lại số lượng
+                        var areaInventories = await _areaInventoryRepo.GetAll(true)
+                            .Where(ai => ai.ProductId == g.ProductId)
+                            .OrderByDescending(ai => ai.Quantity)
+                            .ToListAsync();
+
+                        var remainingQty = g.Qty;
+                        foreach (var areaInv in areaInventories)
+                        {
+                            if (remainingQty <= 0) break;
+
+                            if (areaInv.IsDeleted)
+                            {
+                                areaInv.IsDeleted = false;
+                            }
+
+                            areaInv.Quantity += remainingQty;
+                            areaInv.UpdatedBy = userId;
+                            areaInv.UpdatedAt = DateTime.UtcNow;
+                            _areaInventoryRepo.Update(areaInv);
+                            remainingQty = 0; // Hoàn toàn bộ vào một area inventory
+                        }
+
+                        // Nếu không tìm thấy area inventory nào, tạo mới
+                        if (remainingQty > 0)
+                        {
+                            // Tìm area đầu tiên hoặc tạo mới (tùy vào logic của bạn)
+                            // Ở đây giả sử có ít nhất một area inventory
+                        }
+                    }
+
+                    await _areaInventoryRepo.SaveChangesAsync();
+                }
+
+                if (newStatus == OrderStatus.Paid)
+                {
 
                     // Cập nhật trạng thái payment từ Pending sang Completed cho các payment không phải tiền mặt
                     var pendingPayments = await _paymentRepo.GetAll(false)
@@ -629,12 +681,48 @@ namespace Quanlicuahang.Services
                 }
                 else if (newStatus == OrderStatus.Cancelled)
                 {
-                    // Hoàn kho khi hủy đơn hàng (chỉ khi đơn ở trạng thái Confirmed - đã duyệt nhưng chưa thanh toán)
-                    // Đơn hàng đã thanh toán (Paid) không thể hủy
-                    if (currentStatus == OrderStatus.Confirmed)
+                    // Hoàn kho khi hủy đơn hàng (chỉ khi đơn đã ở trạng thái Delivered hoặc Paid - đã trừ kho)
+                    if (currentStatus == OrderStatus.Delivered || currentStatus == OrderStatus.Paid)
                     {
-                        // Trường hợp này không xảy ra vì Confirmed chưa trừ kho, nhưng để đảm bảo logic rõ ràng
-                        // Không cần hoàn kho vì chưa trừ kho
+                        var grouped = order.OrderItems.Where(oi => !oi.IsDeleted)
+                            .GroupBy(x => x.ProductId)
+                            .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                            .ToList();
+
+                        foreach (var g in grouped)
+                        {
+                            // Hoàn kho: tìm AreaInventory của sản phẩm này và cộng lại số lượng
+                            var areaInventories = await _areaInventoryRepo.GetAll(true)
+                                .Where(ai => ai.ProductId == g.ProductId)
+                                .OrderByDescending(ai => ai.Quantity)
+                                .ToListAsync();
+
+                            var remainingQty = g.Qty;
+                            foreach (var areaInv in areaInventories)
+                            {
+                                if (remainingQty <= 0) break;
+
+                                if (areaInv.IsDeleted)
+                                {
+                                    areaInv.IsDeleted = false;
+                                }
+
+                                areaInv.Quantity += remainingQty;
+                                areaInv.UpdatedBy = userId;
+                                areaInv.UpdatedAt = DateTime.UtcNow;
+                                _areaInventoryRepo.Update(areaInv);
+                                remainingQty = 0; // Hoàn toàn bộ vào một area inventory
+                            }
+
+                            // Nếu không tìm thấy area inventory nào, tạo mới
+                            if (remainingQty > 0)
+                            {
+                                // Tìm area đầu tiên hoặc tạo mới (tùy vào logic của bạn)
+                                // Ở đây giả sử có ít nhất một area inventory
+                            }
+                        }
+
+                        await _areaInventoryRepo.SaveChangesAsync();
                     }
                     // Nếu đơn ở trạng thái Pending hoặc Confirmed thì không cần hoàn kho vì chưa trừ kho
                 }
@@ -661,7 +749,7 @@ namespace Quanlicuahang.Services
                 return (await GetByIdAsync(order.Id))!;
             }
 
-            // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending hoặc Confirmed (chưa thanh toán)
+            // 2) Chỉnh sửa nội dung đơn: chỉ khi Pending hoặc Confirmed (chưa giao hàng và chưa thanh toán)
             if (order.Status != OrderStatus.Pending && order.Status != OrderStatus.Confirmed)
                 throw new System.Exception($"Chỉ cho phép chỉnh sửa khi đơn hàng đang Pending hoặc Confirmed. Trạng thái hiện tại: {order.Status}");
 
@@ -781,11 +869,17 @@ namespace Quanlicuahang.Services
             return currentStatus switch
             {
                 OrderStatus.Pending => newStatus == OrderStatus.Confirmed ||
+                                     newStatus == OrderStatus.Delivered ||
                                      newStatus == OrderStatus.Paid ||
                                      newStatus == OrderStatus.Cancelled,
 
-                OrderStatus.Confirmed => newStatus == OrderStatus.Paid ||
+                OrderStatus.Confirmed => newStatus == OrderStatus.Delivered ||
+                                       newStatus == OrderStatus.Paid ||
                                        newStatus == OrderStatus.Cancelled,
+
+                OrderStatus.Delivered => newStatus == OrderStatus.Paid ||
+                                       newStatus == OrderStatus.Confirmed || // Cho phép chuyển về Confirmed để giao lại
+                                       newStatus == OrderStatus.Cancelled, // Cho phép hủy nếu khách không nhận hàng
 
                 OrderStatus.Paid => false, // Đơn hàng đã thanh toán không thể thay đổi trạng thái
 
@@ -838,7 +932,8 @@ namespace Quanlicuahang.Services
         }
 
         /// <summary>
-        /// API đặt hàng từ Mobile App - Tạo đơn hàng và trừ số lượng sản phẩm
+        /// API đặt hàng từ Mobile App - Tạo đơn hàng với trạng thái Pending (chưa trừ kho)
+        /// Kho sẽ được trừ khi đơn hàng chuyển sang Delivered hoặc Paid
         /// </summary>
         public async Task<MobileOrderResponseDto> CreateMobileOrderAsync(MobileOrderCreateDto dto)
         {
@@ -898,7 +993,7 @@ namespace Quanlicuahang.Services
                 IsDeleted = false
             };
 
-            // Tạo OrderItems và trừ số lượng sản phẩm
+            // Tạo OrderItems (KHÔNG trừ kho ngay - sẽ trừ khi chuyển sang Delivered hoặc Paid)
             var orderItems = new List<OrderItem>();
 
             foreach (var item in dto.Items)
@@ -916,29 +1011,6 @@ namespace Quanlicuahang.Services
                     IsDeleted = false
                 };
                 orderItems.Add(orderItem);
-
-                // Trừ số lượng từ AreaInventory (khu vực kho)
-                var remainingQty = item.Quantity;
-
-                // Lấy danh sách AreaInventory có sản phẩm này, sắp xếp theo số lượng giảm dần
-                var areaInventories = await _areaInventoryRepo.GetAll(false)
-                    .Where(ai => ai.ProductId == item.ProductId && ai.Quantity > 0)
-                    .OrderByDescending(ai => ai.Quantity)
-                    .ToListAsync();
-
-                foreach (var areaInv in areaInventories)
-                {
-                    if (remainingQty <= 0) break;
-
-                    var deductQty = Math.Min(remainingQty, areaInv.Quantity);
-                    areaInv.Quantity = Math.Max(0, areaInv.Quantity - deductQty);
-                    areaInv.UpdatedBy = "Mobile App";
-                    areaInv.UpdatedAt = DateTime.UtcNow;
-                    if (areaInv.Quantity <= 0) areaInv.IsDeleted = true;
-                    _areaInventoryRepo.Update(areaInv);
-
-                    remainingQty -= deductQty;
-                }
             }
 
             order.OrderItems = orderItems;
