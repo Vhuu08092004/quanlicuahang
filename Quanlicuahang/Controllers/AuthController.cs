@@ -108,5 +108,21 @@ namespace Quanlicuahang.Controllers
         {
             return Ok(new { message = "Đăng xuất thành công!" });
         }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            var userId = User.Identity?.Name;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "Không xác định được người dùng!" });
+
+            var ok = await _authService.ChangePasswordAsync(userId, request);
+
+            if (!ok)
+                return BadRequest(new { message = "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại." });
+
+            return Ok(new { message = "Đổi mật khẩu thành công!" });
+        }
     }
 }

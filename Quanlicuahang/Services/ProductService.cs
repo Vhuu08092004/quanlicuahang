@@ -282,6 +282,7 @@ namespace Quanlicuahang.Services
                             AttributeId = av.AttributeId,
                             AttributeName = av.Attribute.Name,
                             AttributeCode = av.Attribute.Code,
+                            DataType = av.Attribute.DataType,
                             ValueString = av.ValueString,
                             ValueDecimal = av.ValueDecimal,
                             ValueInt = av.ValueInt,

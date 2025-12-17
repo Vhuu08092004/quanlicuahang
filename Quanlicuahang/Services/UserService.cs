@@ -16,6 +16,8 @@ namespace Quanlicuahang.Services
         Task<bool> UpdateAsync(string id, UserCreateUpdateDto dto);
         Task<bool> DeActiveAsync(string id);
         Task<bool> ActiveAsync(string id);
+        Task<bool> ChangePasswordAsync(string userId, ChangePasswordDto dto);
+        Task<User> CreateUserForEmployeeAsync(string employeeId, string employeeCode, string employeeName, string createdByUserId);
     }
 
     public class UserService : IUserService
@@ -176,6 +178,63 @@ namespace Quanlicuahang.Services
             return await GetByIdAsync(user.Id) ?? throw new System.Exception("Tạo người dùng thất bại!");
         }
 
+        // Tạo user tự động cho nhân viên
+        public async Task<User> CreateUserForEmployeeAsync(string employeeId, string employeeCode, string employeeName, string createdByUserId)
+        {
+            // Kiểm tra xem user đã tồn tại chưa
+            var existingUser = await _userRepo.GetByUsernameAsync(employeeCode);
+            if (existingUser != null)
+            {
+                throw new System.Exception($"Username '{employeeCode}' đã tồn tại!");
+            }
+
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            // Tạo user mới
+            var user = new User
+            {
+                Id = Guid.NewGuid().ToString(),
+                Username = employeeCode,
+                Password = HashPassword("123456"), // Mật khẩu mặc định
+                FullName = employeeName,
+                EmployeeId = employeeId,
+                CreatedBy = createdByUserId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedBy = createdByUserId,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _userRepo.AddAsync(user);
+
+            // Tìm role Employee
+            var employeeRole = await _roleRepo.GetAll()
+                .FirstOrDefaultAsync(r => r.Name == "Employee");
+
+            if (employeeRole != null)
+            {
+                await _userRoleRepo.AddUserRoleAsync(user.Id, employeeRole.Id);
+            }
+
+            await _userRepo.SaveChangesAsync();
+
+            // Log action
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "Create",
+                entityType: "User",
+                entityId: user.Id,
+                description: $"Tạo tài khoản tự động cho nhân viên {employeeName} (Username: {employeeCode})",
+                oldValue: null,
+                newValue: user,
+                userId: createdByUserId,
+                ip: ip,
+                userAgent: agent
+            );
+
+            return user;
+        }
+
         public async Task<bool> UpdateAsync(string id, UserCreateUpdateDto dto)
         {
             var user = await _userRepo.GetAll()
@@ -302,6 +361,45 @@ namespace Quanlicuahang.Services
                 oldValue: oldValue,
                 newValue: new { user.IsDeleted, user.UpdatedAt },
                 userId: userId,
+                ip: ip,
+                userAgent: agent
+            );
+
+            return true;
+        }
+
+        public async Task<bool> ChangePasswordAsync(string userId, ChangePasswordDto dto)
+        {
+            var user = await _userRepo.GetByIdAsync(userId);
+            if (user == null)
+                throw new System.Exception("不找不到人使用者");
+
+            // Kiểm tra mật khẩu hiện tại
+            var hashedCurrentPassword = HashPassword(dto.CurrentPassword);
+            if (user.Password != hashedCurrentPassword)
+                throw new System.Exception("Mật khẩu hiện tại không đúng");
+
+            // Cập nhật mật khẩu mới
+            var currentUserId = await _tokenHelper.GetUserIdFromTokenAsync();
+            var ip = _httpContext.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContext.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            user.Password = HashPassword(dto.NewPassword);
+            user.UpdatedBy = currentUserId;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            _userRepo.Update(user);
+            await _userRepo.SaveChangesAsync();
+
+            await _logService.LogAsync(
+                code: Guid.NewGuid().ToString(),
+                action: "ChangePassword",
+                entityType: "User",
+                entityId: user.Id,
+                description: $"Đổi mật khẩu cho người dùng {user.Username}",
+                oldValue: null,
+                newValue: null,
+                userId: currentUserId,
                 ip: ip,
                 userAgent: agent
             );

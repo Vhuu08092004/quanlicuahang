@@ -25,18 +25,21 @@ namespace Quanlicuahang.Services
         private readonly IHttpContextAccessor _httpContext;
         private readonly ITokenHelper _tokenHelper;
         private readonly IEmployeeRepository _repository;
+        private readonly IUserService _userService;
 
         public EmployeeService(
             IActionLogService logService,
             IHttpContextAccessor httpContext,
             ITokenHelper tokenHelper,
-            IEmployeeRepository repository
+            IEmployeeRepository repository,
+            IUserService userService
         )
         {
             _logService = logService;
             _httpContext = httpContext;
             _tokenHelper = tokenHelper;
             _repository = repository;
+            _userService = userService;
         }
 
         // 🔹 Hàm sinh mã nhân viên tự động: EMP001, EMP002, ...
@@ -104,6 +107,33 @@ namespace Quanlicuahang.Services
                 ip: ip,
                 userAgent: agent
             );
+
+            // Tự động tạo tài khoản user cho nhân viên
+            try
+            {
+                await _userService.CreateUserForEmployeeAsync(
+                    employeeId: employee.Id,
+                    employeeCode: employee.Code,
+                    employeeName: employee.Name,
+                    createdByUserId: userId
+                );
+            }
+            catch (System.Exception ex)
+            {
+                // Log lỗi nhưng không throw để không ảnh hưởng việc tạo nhân viên
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "Error",
+                    entityType: "User",
+                    entityId: employee.Id,
+                    description: $"Lỗi tạo tài khoản cho nhân viên {employee.Name}: {ex.Message}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: userId,
+                    ip: ip,
+                    userAgent: agent
+                );
+            }
 
             return (await GetByIdAsync(employee.Id))!;
         }

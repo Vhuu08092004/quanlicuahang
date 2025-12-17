@@ -77,5 +77,23 @@ namespace Quanlicuahang.Controllers
             if (!result) return NotFound();
             return NoContent();
         }
+
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request)
+        {
+            try
+            {
+                var userId = User.FindFirst("UserId")?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized(new { message = "Không thể xác định người dùng" });
+
+                var result = await _userService.ChangePasswordAsync(userId, request);
+                return Ok(new { message = "Đổi mật khẩu thành công" });
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

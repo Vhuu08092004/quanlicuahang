@@ -68,7 +68,11 @@ namespace Quanlicuahang.Services
                     DataType = a.DataType,
                     IsDeleted = a.IsDeleted,
                     CreatedAt = a.CreatedAt,
-                    UpdatedAt = a.UpdatedAt
+                    UpdatedAt = a.UpdatedAt,
+                    isCanView = true,
+                    isCanEdit = !a.IsDeleted,
+                    isCanDeActive = !a.IsDeleted,
+                    isCanActive = a.IsDeleted
                 })
                 .ToListAsync();
 
@@ -284,7 +288,8 @@ namespace Quanlicuahang.Services
                 {
                     Id = c.Id,
                     Code = c.Code,
-                    Name = c.Name
+                    Name = c.Name,
+                    DataType = c.DataType
                 });
 
             var data = await query.ToListAsync();

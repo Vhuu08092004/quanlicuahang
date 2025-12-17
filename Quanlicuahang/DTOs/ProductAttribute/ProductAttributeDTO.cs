@@ -32,6 +32,7 @@ namespace Quanlicuahang.DTOs.ProductAttribute
         public string AttributeId { get; set; } = string.Empty;
         public string AttributeName { get; set; } = string.Empty;
         public string AttributeCode { get; set; } = string.Empty;
+        public string? DataType { get; set; }
         public string? ValueString { get; set; }
         public decimal? ValueDecimal { get; set; }
         public int? ValueInt { get; set; }

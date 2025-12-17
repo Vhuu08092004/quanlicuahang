@@ -530,5 +530,87 @@ namespace Quanlicuahang.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        // ⭐ ĐỔI MẬT KHẨU (Khi đã đăng nhập)
+        public async Task<bool> ChangePasswordAsync(string userId, ChangePasswordRequest request)
+        {
+            var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            var agent = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
+                    string.IsNullOrWhiteSpace(request.NewPassword) ||
+                    string.IsNullOrWhiteSpace(request.ConfirmPassword))
+                {
+                    return false;
+                }
+
+                if (request.NewPassword != request.ConfirmPassword)
+                {
+                    return false;
+                }
+
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null || user.IsDeleted)
+                {
+                    return false;
+                }
+
+                // Verify current password
+                var hashedCurrentPassword = HashPassword(request.CurrentPassword);
+                if (user.Password != hashedCurrentPassword)
+                {
+                    await _logService.LogAsync(
+                        code: Guid.NewGuid().ToString(),
+                        action: "ChangePassword",
+                        entityType: "Auth",
+                        entityId: user.Id,
+                        description: $"User '{user.Username}' đổi mật khẩu thất bại - mật khẩu hiện tại không đúng",
+                        oldValue: null,
+                        newValue: null,
+                        userId: user.Id,
+                        ip: ip,
+                        userAgent: agent
+                    );
+                    return false;
+                }
+
+                // Update password
+                user.Password = HashPassword(request.NewPassword);
+                await _userRepository.UpdateAsync(user);
+
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "ChangePassword",
+                    entityType: "Auth",
+                    entityId: user.Id,
+                    description: $"User '{user.Username}' đổi mật khẩu thành công",
+                    oldValue: null,
+                    newValue: new { user.Id, user.Username, changeTime = DateTime.UtcNow },
+                    userId: user.Id,
+                    ip: ip,
+                    userAgent: agent
+                );
+
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                await _logService.LogAsync(
+                    code: Guid.NewGuid().ToString(),
+                    action: "ChangePassword",
+                    entityType: "Auth",
+                    entityId: userId,
+                    description: $"Lỗi khi đổi mật khẩu: {ex.Message}",
+                    oldValue: null,
+                    newValue: null,
+                    userId: userId,
+                    ip: ip,
+                    userAgent: agent
+                );
+                return false;
+            }
+        }
     }
 }
